@@ -94,3 +94,99 @@ public class Part {
 IShapeFactory : ShapeFactory -> ShapeFactory : ShapeFactoryImpl, 选择在实现类的接口加名称编码也许来得更好些
 
 #### 避免思维映射
+不应当让读者在脑中把你的名称翻译为他们熟知的名称, 这种问题常常出现在选择使用问题领域术语还是解决方案领域术语时; 专业的程序员应当了解 **明确是王道**, 专业的程序员应当善用其能, 编写其他人能理解的代码
+
+#### 类名
+类名和对象名应该是名词或名词短语, 类名不应当是动词
+
+#### 方法名
+方法名应当是动词或者动词短语; 属性访问器, 修改器和断言应当根据其值命名, 并依据 Javabean 标准加上 get, set 和 is 前缀  
+重载构造器时, 使用描述了参数的静态工厂方法名: Complex fulcrumPoint = Complex.FromRealNumber(23.0) 通常好于 Complex fulcrumPoint = new Complex(23.0), 可以考虑将相应的构造器设置为 private, 强制使用这种命名手段
+
+#### 别扮可爱
+如果名称太耍宝, 那就只有同作者一般具有幽默感的人才能记得住, 而且还是在她们记得那个笑话的时候才行; 扮可爱的做法在代码中经常体现为使用俗语或俚语: 别用 eatMyShorts() 这类与文化紧密相关的笑话来表示 abort()
+
+#### 每个概念对应一个词
+给每个抽象的概念选一个词, 并且一以贯之; 例如, 使用 fetch, retrieve, get 来给在多个类中的同种方法命名, 很难记得住哪个类中的哪个方法是用来做什么的, 就得耗费大把的时间浏览各个文件头及前面的代码; 再调用方法时, 编辑器通常不会给出函数名和参数列表的编写的注释, 如果参数名来自函数声明, 那必是极好的; 函数名称应当独一无二, 而且要保持一致, 这样才不用借助多余的浏览就能找到正确的方法; 对于类名也是, 同类型的类使用相同的前缀或后缀, 一贯以之的命名法是天降福音
+
+#### 别用双关语
+避免将同一单词用于不同目的, 同一术语用于不同概念, 基本上就是双关语了;  如果遵循 "一词一义" 规则, 可能在好多类中都会有 add 方法, 只要这些 add 方法的参数列表和返回值在语义上等价就一切顺利; 代码作者应尽力写出易于理解的代码, 而不必殚精竭虑的研究; 推崇哪种大众化的作者尽责写清楚的平装书模式, 尽量避免哪种学者挖地三尺才能明白个中意义的学院派模式
+
+#### 使用解决方案领域名称
+只有程序员才会读你的代码, 所以尽管使用那些计算机科学术语, 算法名, 模式名, 数据术语吧; 依据问题所涉及领域命名可能不是聪明的做法, 因为不该让你的协作者总是跑去问客户每个名称的含义, 他们早该通过另一名称了解这个概念了; 对于熟悉访问者模式的程序员来说, 名称 AccountVisitor 富有含义, 程序员要做太多技术性工作了, 给这些事物取个技术性的名称通常是最靠谱的做法
+
+#### 使用源自所涉问题领域的名称
+如果不能用程序员熟悉的术语来给手头的工作命名, 就采用从所涉问题领域而来的名称; 至少负责维护代码的程序员就能去请教领域专家了; 程序员的工作之一就是分离解决方案领域和问题领域的概念, 与所涉问题领域更为贴近的代码, 应当采用源自问题领域的名称
+
+#### 添加有意义的语境
+很少有名称是能自我说明的 --- 多数都不能; 反之, 需要用有良好命名的类, 函数, 名称空间来放置名称, 给读者提供语境; 如果没这么做, 给名称添加前缀就是最后一招了  
+以下代码中的变量是否需要更有意义的语境呢? 函数名仅给出了部分语境, 算法提供了一部分; 便览函数后, 你就会知道 number, verb, pluralModifier 这三个变量是测估信息的一部分, 不幸的是这语境得靠读者自己推断出来; 第一眼看到这个方法时, 这些变量的含义完全不清楚
+```
+private void printGuessStatistics(char candidate, int count) {
+    String number;
+    String verb;
+    String pluralModifier;
+    if (count == 0) {
+        number = "no";
+        verb = "are";
+        pluralModifier = "s";
+    } else if (count == 1) {
+        number = "1";
+        verb = "is";
+        pluralModifier = "";
+    } else {
+        number = Integer.toString(count);
+        verb = "are";
+        pluralModifier = "s";
+    }
+    String guessMessage = String.format("There %s %s %s%s", verb, number, candidate, pluralModifier);
+    print(guessMessage);
+}
+```
+上述函数有点长, 变量的使用贯穿始终; 要分解这个函数, 需要创建一个名为 GuessStatisticsMessage 的类, 把这三个变量做成该类的成员字段; 这样它们就在定义上变作了 GuessStatisticsMessage 的一部分; 语境的增强也让算法能够通过分解为更小的函数而变得更为干净利落
+```
+public class GuessStatisticsMessage {
+    private String number;
+    private String verb;
+    private String pluralModifier;
+
+    public String make(char cnadidate, int count) {
+        createPluralDependentMessageParts(count);
+        return String.format("There %s %s %s%s", verb, number, candidate, pluralModifier);
+    }
+
+    private void createPluralDependentMessageParts(int count) {
+        if (count == 0) {
+            thereAreNoLetters();
+        } else if (count == 1) {
+            thereIsOneLetter();
+        } else {
+            thereAreManyLetters(count)
+        }
+    }
+
+    private void thereAreManyLetters(int count) {
+        number = Integer.toString(count);
+        verb = "are";
+        pluralModifier = "s";
+    }
+
+    private void thereIsOneLetter() {
+        number = "1";
+        verb = "is";
+        pluralModifier = "";
+    }
+
+    private void thereAreNoLetters() {
+        number = "no";
+        verb = "are";
+        pluralModifier = "s";
+    }
+}
+```
+
+#### 不要添加没用的语境
+只要短名称足够清楚, 就要比长名称好; 不要给名称添加不必要的语境
+
+#### 最后的话
+取好名字最难的地方在于需要良好的描述技巧和共有的文化背景; 与其说这是一种技术, 商业或管理问题, 还不如说是一种教学问题
