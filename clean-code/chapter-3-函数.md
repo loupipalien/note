@@ -96,3 +96,4 @@ public class EmployeeFactoryImpl implements EmployeeFactory {
 给函数取个好名字, 能够较好的解释函数的意图, 以及参数的顺序和意图; 对于一元函数, 函数名与参数应当形成一种非常良好的动词/名词对形式; 例如: write(name) 或 wirteField(name)
 
 #### 无副作用
+副作用是一种谎言. 函数承诺只做一件事, 但是还是会做其他的被藏起来的事
