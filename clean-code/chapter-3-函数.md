@@ -96,4 +96,26 @@ public class EmployeeFactoryImpl implements EmployeeFactory {
 给函数取个好名字, 能够较好的解释函数的意图, 以及参数的顺序和意图; 对于一元函数, 函数名与参数应当形成一种非常良好的动词/名词对形式; 例如: write(name) 或 wirteField(name)
 
 #### 无副作用
-副作用是一种谎言. 函数承诺只做一件事, 但是还是会做其他的被藏起来的事
+副作用是一种谎言. 函数承诺只做一件事, 但是还是会做其他的被藏起来的事; 但有时它会对自己类中的变量做出未能预期的改动, 例如会把变量搞成函数传递的参数或者是系统全局变量, 无论哪种情况都是具有破坏性的, 会导致古怪的时序性耦合及顺序依赖
+```
+public class UserValidator {
+    private Cryptographer cryptographer;
+
+    public boolean checkPassword(String userName, String password) {
+        User user = UserGateway.findByName(userName);
+        if (user != User.NULL) {
+            String codedPhrase = user.getPhraseEncodedByPassword();
+            String phrase = cryptographer.decrypt(codedPhrase, password);
+            if ("Valid Password").equals(phrase) {
+                Session.initialize();
+                return true;
+            }
+        }
+        return false;
+    }
+}
+```
+以上函数的副作用就在于 Session.initialize() 的调用; checkPassword 函数就是用来检查密码的, 该函数并未暗示它会初始化该会话, 所以当某个误信了函数名的调用者想要检查用户有效性时, 就得冒着抹除现有会话数据的风险; 这一副作用造出了一次时序性耦合, 也就是说 checkPassword 至能在特定时刻调用 (即在初始化会话是安全的时候调用); 如果在不合适的时候调用, 会话数据就有可能沉默的丢失; 时序性使人迷惑, 特别是当它躲在副作用后面的时候
+
+##### 输出参数
+面向对象语言中对输出参数的大部分需求已经消失了, 因为 this 也有输出函数的以为意味在内; 普遍而言应该避免使用输出参数, 如果参数必须要修改某种状态, 就修好所属对象的状态吧
