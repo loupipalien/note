@@ -33,7 +33,7 @@ protected abstract Responder responderInstance();
 有时注释不仅提供了有关实现的有用信息, 而且还提供了某个决定后面的意图; 例如以下示例, 在对比两个对象时, 作者决定将自己的类放置在比其他东西更高的位置
 ```
 public int compareTo(Object o) {
-    if (o instanceOf WikiPagePath) {
+    if (o instanceof WikiPagePath) {
         WikiPagePath p = (WikiPagePath) o;
         String compressedName = StringUtil.join(names, "");
         String compressedArgumentName = StringUtil.join(p.names, "");
