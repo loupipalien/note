@@ -108,3 +108,25 @@ final String outputDir = ctxt.getOptions().getScratchDir().getAbsolutePath();
 ```
 
 ##### 火车失事
+连续调用的代码常被称为火车失事, 因为其看起来就像是一列火车, 这种连续的调用被认为是肮脏的风格, 因该避免; 最好做如下切分 (ElasticSearch 反而是这种风格...)
+```
+Options opts = ctxt.getOptions();
+File scratchDir = opts.getScratchDir();
+final String outputDir = scratchDir.getAbsolutePath();
+```
+这些代码是否违反得墨忒耳律, 取决于 ctxt, Options 和 ScratchDir 是对象还是数据结构; 如果是对象, 则它们的内部结构应当不被曝露, 而有关内部细节的知识就明显违反了得墨忒耳律; 如果 ctxt, Options 和 ScratchDir 只是数据结构, 没有任何行为, 则它们自然会曝露其内部结构, 得墨忒耳律自然也就不适用了, 这里是因为属性访问器函数的使用吧问题搞复杂了
+
+##### 混杂
+这种混淆有时会不幸的导致混合结构, 一半是对象, 一般是数据结构; 这种结构拥有执行操作的函数, 也有公共变量或公共访问器及改值器; 无论出于怎样的初衷, 公共访问器及改值器都把私有化变量公开化, 诱导外部函数以过程式程序使用数据结构的方式使用这些变量; 此类混杂增加了新函数的难度, 也增加了添加新数据结构的难度, 应该避免这种结构
+
+##### 隐藏结构
+假设 ctxt 是拥有真实行为的对象, 由于对象应隐藏在其内部结构, 防止让外部用户看到不该看到的对象而违反了得墨忒耳律; 所以直接让 ctxt 直接提供操作从而达到隐藏结构的效果
+```
+BufferedOutputStream bos = ctxt.createScratchFileStream(classFileName);
+```
+
+#### 数据传送对象
+最为精炼的数据结构是一个只有公共变量, 没有函数的类; 这种数据结构有时候被称为数据传送对象, 或 DTO (Data Transfer Objects), 即通常说的 JavaBean
+
+#### 小结
+对象曝露行为, 隐藏数据; 便于添加新对象类型而无需修改既有行为, 同时也难以在既有对象中添加新行为; 数据结构曝露数据, 没有明显的行为; 便于向既有数据结构添加新行为, 同时也难以向既有函数添加新数据结构
