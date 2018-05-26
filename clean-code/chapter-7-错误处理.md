@@ -56,3 +56,4 @@ public class DeviceController {
 这段代码整洁了很多, 是因为之纠结的两个元素设备关闭算法和错误处理现在被隔离了, 可以分别查看其中某一元素去理解它
 
 #### 先写 Try-Catch-Finally 语句
+异常的妙处之一就是, 它们在程序中定义了一个范围; 执行 try-catch-finally 语句中的 try 部分的代码时, 是在表明可以随时取消执行, 并在 catch 语句中接续
