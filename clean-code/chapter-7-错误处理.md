@@ -120,3 +120,35 @@ public class LocalPort {
 LocalPort 类就是个简单的打包类, 捕获并翻译由 ACMEPort 类抛出的异常; 这种将第三方 API 打包是个良好的实践手段, 因为当你打包一个第三方 API, 就降低了对它的依赖: 未来可以不太痛苦的改用其他代码库
 
 #### 定义常规流程
+如果遵循了前文提及的建议, 在业务逻辑和错误处理代码之间就会有良好的区隔, 大量代码会开始变得像是整洁而简朴的算法; 以下代码是来自某个记账应用的开支总计模块
+```
+try {
+    MealExpeneses expenses = expenseReportDAO.getMeals(employee.getID());
+    m_total += expenses.getTotal();
+} catch (MealExpenesesNotFound e) {
+    m_total += getMealPerDiem();
+}
+```
+业务逻辑是, 如果消耗了餐食则计入总额中, 如果没有消耗则员工得到当日餐食补贴; 异常打断了业务逻辑, 如果不去处理特殊情况会不会好一点, 那样的代码看起来更简洁
+```
+MealExpeneses expenses = expenseReportDAO.getMeals(employee.getID());
+m_total += expenses.getTotal();
+```
+如何把代码简洁化且符合业务逻辑, 答案是修改 ExpensesReportDAO, 使其总是返回 MealExpeneses 对象, 如果没有餐食消耗则返回一个餐食补贴的 MealExpeneses 对象
+```
+public class PerDiemMealExpenses implements MealExpeneses {
+    public int getTotal() {
+        // return the per diem default
+    }
+}
+```
+这种手法叫特例模式 (Special Case Pattern), 创建一个类或配置一个对象, 用来处理特例; 这样客户端代码就不用应付异常行为了, 异常行为被封装在了特例对象中
+
+#### 别返回 null 值
+返回 null 基本上就是在给自己增加工作量, 也是给调用者添乱, 只要一处没检查 null, 应用程序就会失控; 如果打算在方法中返回 null 值, 不如抛出异常, 或者返回特例对象; 如果是在调第三方 API 中可能返回 null 值的方法, 可以考虑用新方法打包这个方法, 在新方法中抛出异常或返回特例对象; 这样代码会更整洁, 也就能尽量避免 NullPointerException 的出现
+
+#### 别传递 null 值
+在方法中返回 null 值是糟糕的做法, 但将 null 值传递给其他方法就更糟糕了, 除非 API 要求你向它传递 null 值, 否则就要尽可能的避免传递 null 值; 传入 null 往往会得到错误, 但在大多数编程语言中, 没有良好的方法能对付调用者意外传入的 null 值; 恰当的做法就是禁止传入 null 值, 在编码的时候时时记住参数列表中 null 值意味着出问题了, 从而大量避免这种无心之失
+
+#### 小结
+整洁代码是可读的, 但也要加固; 可读和强固并不冲突, 如果将错误处理隔离看待, 独立于主要逻辑之外, 就能写出强固而整洁的代码
