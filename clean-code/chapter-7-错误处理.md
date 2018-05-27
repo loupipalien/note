@@ -56,4 +56,67 @@ public class DeviceController {
 这段代码整洁了很多, 是因为之纠结的两个元素设备关闭算法和错误处理现在被隔离了, 可以分别查看其中某一元素去理解它
 
 #### 先写 Try-Catch-Finally 语句
-异常的妙处之一就是, 它们在程序中定义了一个范围; 执行 try-catch-finally 语句中的 try 部分的代码时, 是在表明可以随时取消执行, 并在 catch 语句中接续
+异常的妙处之一就是, 它们在程序中定义了一个范围; 执行 try-catch-finally 语句中的 try 部分的代码时, 是在表明可以随时取消执行, 并在 catch 语句中接续; 在某种意义上, try 代码就像是事务, catch 代码将程序维持在一种持续状态, 无论 try 代码块中发生了什么均如此; 所以在编写可能抛出异常的代码时, 最好先写出 try-catch-finally 语句
+
+#### 使用不可控异常
+Java 中引入了可控异常, 即每个方法的签名都列出了它可能传递给调用者的异常, 而且这异常是方法类型的一部分, 如果签名与代码实际所做之事不符, 则代码在字面上就无法编译  
+可控异常是个绝妙的主意, 而且它也是有所裨益的, 但现在业界已经清楚的是, 其对于强固软件的生产是非必需的; 另外一方面使用它也是有代价的, 可控异常的代价就是违反开放/闭合原则; 如果你在方法中抛出可控异常, 而 catch 语句在三个层级之上, 你就得在 catch 语句和抛出异常处之间的每个方法签名中声明该异常; 这意味着对软件中较低层级的修改, 都将波及较高层级的签名, 修改好的模块必须重新构建发布, 即便它们自身所关注的任何东西都没改动过  
+如果在编写一套关键代码库, 则可控异常有时会有用, 因为必须捕获异常; 但对于一般的应用开发, 其依赖成本要高于收益
+
+#### 给出异常发生的环境说明
+抛出的每个异常都应当提供足够的环境说明, 以便判断错误的来源和分析; 在 Java 中, 可以从任何异常里得到堆栈踪迹 (stack trace), 然而堆栈信息中并没有该操作失败的初衷; 所以应创建信息充分的错误消息, 并和异常一起传递出去, 在消息中应该包括失败的操作和失败类型; 在应用中还应该使用日志在 catch 块中记录下来
+
+#### 依调用者需要定义异常类
+对错误的分类有很多种; 可以依其来源分类: 是来自组件还是其他地方? 或依其类型分类: 是设备错误还是编程错误? 在应用中定义异常类时, 最重要的考虑应该是它们如何被捕获; 以下是一个不太好的异常分类的例子
+```
+ACMEPort port = new ACMEPort(12);
+try {
+    port.open();
+} catch (DeviceResponseException e) {
+    reportPortError(e);
+    logger.log("Device Response exception", e);
+} catch (ATM1212UnlockedEeception e) {
+    reportPortError(e);
+    logger.log("Unlock exception", e);
+} catch (GMXError e) {
+    reportPortError(e);
+    logger.log("Device response exception", e);
+} finally {
+    ...
+}
+```
+改语句包含了一大堆异常捕获代码, 这并不出奇, 因为这时标准的处理流程: 捕获异常, 记录错误, 确保代码能继续工作; 我们可以通过打包调用 API, 确保它返回通用异常类型, 从而简化代码
+```
+LocalPort port = new LocalPort(12);
+try {
+    port.open();
+} catch (PortDeviceFailure e) {
+    reportPortError(e);
+    logger.log(e.getMessage, e)
+} finally {
+    ...
+}
+
+public class LocalPort {
+    private ACMEPort innerPort;
+
+    public LocalPort(int portNumber) {
+        innerPort = new ACMEPort(portNumber);
+    }
+
+    public void open() {
+      try {
+          innerPort.open();
+      } catch (DeviceResponseException e) {
+          throw new PortDeviceFailure(e);
+      } catch (ATM1212UnlockedEeception e) {
+          throw new PortDeviceFailure(e);
+      } catch (GMXError e) {
+          throw new PortDeviceFailure(e);
+      }
+    }
+}
+```
+LocalPort 类就是个简单的打包类, 捕获并翻译由 ACMEPort 类抛出的异常; 这种将第三方 API 打包是个良好的实践手段, 因为当你打包一个第三方 API, 就降低了对它的依赖: 未来可以不太痛苦的改用其他代码库
+
+#### 定义常规流程
