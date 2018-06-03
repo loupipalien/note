@@ -47,3 +47,68 @@ JNDI 查找是 DI 的一种 "部分" 实现, 在 JNDI 中对象请求目录服�
 真正的依赖注入还要更进一步; 类并不直接分解其依赖, 而是完全被动的; 它提供可用于注入依赖的赋值器方法或构造器参数 (或二者皆有); 在构造过程中, DI 容器实体化需要的对象 (通常按需创建), 并使用构造器参数或赋值器方法将依赖连接到一起; 至于哪个依赖对象真正得到使用, 是通过配置文件或一个有特殊目的的构造模块中编程决定的; Spring 框架提供了最有名的 Java DI 容器, 用户在 XML 配置文件中定义互相关联的对象, 然后使用 Java 代码请求特定对象
 
 #### 扩容
+"一开始就做对系统" 纯属神话; 反之, 应该只去实现今天的用户故事, 然后重构, 明天再扩展系统实现新的用户故事; 这就是迭代和增量敏捷的精髓所在; 测试驱动开发, 重构以及它们打造出的整洁代码, 在代码层面保证了这个过程的实现; 与物理系统相比软件系统比较独特, 它们的架构都可以递增式地增长, 只要持续将关注面恰当的切分  
+初始的 EJB1 和 EJB2 架构没有恰当的切分关注面, 从而给有机增长压上了不必要的负担; 以下是一个没有充分隔离关注问题的反例
+```
+// Bank EJB 的 EJB2 本地接口
+public interface BankLocal extends java.ejb.EJBLocalObject {
+    String getStreetAddr1() throws EJBException;
+    String getStreetAddr2() throws EJBException;
+    String getCity() throws EJBException;
+    String getState() throws EJBException;
+    String getZipCode() throws EJBException;
+    void setStreetAddr1(String street1) throws EJBException;
+    void setStreetAddr2(String street1) throws EJBException;
+    void setCity(String city) throws EJBException;
+    void setState(String state) throws EJBException;
+    void setZipCode(String zip) throws EJBException;
+    Collection getAccounts() throws EJBException;
+    void setAccounts(Collection accounts) throws EJBException;
+    void addAccount(AccountDTO accountDTO) throws EJBException;
+}
+```
+以上列出了银行地址的几个属性, 和一组该银行拥有的账户, 其中每个账户的数据都由单独的 AccountEJB 所持有
+```
+// 相应的 EJB2 Entity Bean 实现
+public abstract class Bank implements javax.ejb.EntityBean {
+    public abstract String getStreetAddr1();
+    public abstract String getStreetAddr2()
+    public abstract String getCity();
+    public abstract String getState();
+    public abstract String getZipCode();
+    public abstract void setStreetAddr1(String street1);
+    public abstract void setStreetAddr2(String street1);
+    public abstract void setCity(String city);
+    public abstract void setState(String state);
+    public abstract void setZipCode(String zip);
+    public abstract Collection getAccounts();
+    public abstract void setAccounts(Collection accounts);
+    public abstract void addAccount(AccountDTO accountDTO) {
+        InitialContext context = new InitialContext();
+        AccountHomeLocal accountHome = context.lookup("AccountHomeLocal");
+        AccountLocal account = accountHome.create(accountDTO);
+        Collection accounts = getAccounts();
+        accounts.add(account);
+    }
+    // EJB container logic
+    public abstract void setId(Integer id);
+    public abstract Integer getId();
+    public Integer ejbCreate(Integer id) {...}
+    public void ejbPostCreate(Integer id) {...}
+    // The rest had to be implemented but were usually empty
+    public void setEntityContext(EntityContext ctx) {}
+    public void unsetEntityContext() {}
+    public void ejbActivate() {}
+    public void ejbPassivate() {}
+    public void ejbLoad() {}
+    public void ejbStore() {}
+    public void ejbRemove() {}
+  }
+```
+最后要编写一个或多个 XML 部署说明, 将对象相关映射细节指定给某个持久化存储空间, 说明期望的事物行为, 安全约束等; 业务逻辑与 EJB2 应用容器紧密耦合, 必须提供子类化容器类型, 必须提供多个该容器所需要的生命周期方法; 由于存在这种与重量级容器的紧耦合, 隔离单元测试就很困难, 有必要模拟出容器或者花费大量时间在真实服务器上部署 EJB 和测试; 也由于耦合的存在, 在 EJB2 架构之外的复用实际变得不可能
+
+##### 横贯式关注面
+持久化类关注面倾向于横贯某个领域的天然对象边界, 会想用同样的策略来持久化所有对象; 原则上可以从模块, 封装的角度推理持久化策略; 但在实践中, 却不得不将实现了持久化策略的代码铺展到许多对象中, 通常用术语 "横贯式关注面" 来形容这类情况; 同样的, 持久化框架和领域逻辑, 孤立的看可以是模块化的, 问题在于横贯这些领域的情形  
+EJB 架构处理持久化, 安全和事务的方法要早于面向方面编程 (aspect-oriented programming, AOP), 而 AOP 是一种恢复横贯式关注面模块化的普适手段; 在 AOP 中, 被称为方面的模块构造指明了系统中哪些点的行为会以某种一致的方式被修改, 从而支持某种特定的场景, 这种说明是用某种简洁的声明或编程机制来实现的
+
+#### Java 代理
