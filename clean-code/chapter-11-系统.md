@@ -112,3 +112,147 @@ public abstract class Bank implements javax.ejb.EntityBean {
 EJB 架构处理持久化, 安全和事务的方法要早于面向方面编程 (aspect-oriented programming, AOP), 而 AOP 是一种恢复横贯式关注面模块化的普适手段; 在 AOP 中, 被称为方面的模块构造指明了系统中哪些点的行为会以某种一致的方式被修改, 从而支持某种特定的场景, 这种说明是用某种简洁的声明或编程机制来实现的
 
 #### Java 代理
+Java 代理适用于简单的情况, 例如在单独的对象或类中包装方法调用; 然而 JDK 提供的动态代理仅能与接口协同工作, 对于代理类得使用字节码操作库, 如 CGLIB, ASM, Javaassist 等
+```
+/**
+* JDK 代理范例
+*/
+
+// Bank.java
+public interface Bank {
+    Collection<Account> getAccounts();
+    void setAccounts(Collection<Account> accounts);
+}
+
+// BankImpl.java
+public class BankImpl implements Bank {
+    private List<Account> accounts;
+
+    public Collection<Account> getAccounts() {
+        return accounts;
+    }
+
+    public void setAccounts(Collection<Account> accounts) {
+        this.accounts = new ArrayList<Account>();
+        for (Account account: accounts) {
+            this.accounts.add(account);
+        }
+    }
+}
+
+// BankProxyHandler.java
+public class BankProxyHandler implements InvocationHandler {
+    private Bank bank;
+
+    public BankProxyHandler(Bank bank) {
+        this.bank = bank;
+    }
+
+    // Method defined in InvocationHandler
+    public Object invoke(Object proxy, Method method, Object[] objects) throws Throwable {
+        String methodName = method.getName();
+        if (methodName.equals("getAccounts")) {
+            bank.setAccounts(getAccountsFromDatabase());
+            return bank.getAccounts();
+        } else if (methodName.equals("setAccounts")) {
+            bank.setAccounts((Collection<Account>) args[0]);
+            setAccountsToDatabase(bank.getAccounts());
+            return null;
+        } else {
+            ...
+        }
+    }
+
+    // Lost of detail here
+    protected Collection<Account> getAccountsFromDatabase() {...}
+    protected void setAccountsToDatabase(Collection<Account> accounts) {...}
+}
+
+// Somewhere else ...
+Bank bank = (Bank) Proxy.newProxyInstance(Bank.class.getClassLoader(), new Class[] {Bnank.class}, new BankProxyHandler(new BankImpl());
+```
+Proxy API 需要一个 InvocationHandler 对象, 用来实现对代理的全部 Bank 方法调用, BankProxyHandler 使用 Java 反射 API 将一般方法调用映射到 BankImpl 中对应方法, 以此类推
+
+#### 纯 Java AOP 框架
+编程工具能自动处理大多数代理模板代码; 在数个 Java 框架中, 代理都是内嵌的, 从而能够以纯 Java 代码实现面向方面编程; 在 Spring 中, 将业务逻辑代码为旧式 Java 代码, POJO 自扫门前雪, 并不依赖企业框架; 使用描述性配置文件或 API, 把需要的应用程序构架组合起来, 包括持久化, 事务, 安全, 缓存, 恢复等横贯性的问题; 在许多情况下, 框架以对用户透明的方式处理使用 Java 代理或字节代码库的机制; 这些声明驱动了依赖注入容器, DI 容器再实体化主要对象, 并按需将对象连接起来
+```
+// Spring 2.x 的配置文件
+<beans>
+    ...
+    <bean id = "appDataSource" class = "org.apache.commons.dbcp.BasicDataSource" destory-method = "close" p:dricerClassName = "com.mysql.jdbc.Driver" p:url = "jdbc:mysql://localhost:3306/mydb" p:username = "me" />
+
+    <bean id = "bankDataAccessObject" class = "com.example.banking.persistence.BankDataAccessObject" p:dataSource-ref = "appDataSource" />
+
+    <bean id = "bank" class = "com.example.banking.model.Bank" p:dataAccessObject-ref = "bankDataAccessObject" />
+    ...
+</beans>
+```
+在应用程序中, 只添加少数几行代码, 用来向 DI 容器请求系统中的顶层对象, 如 XML 文件中所定义的那样
+```
+XmlBeanFactory bf = new XmlBeanFactory(new ClassPathResource("app.xml", getClass()));
+Bank bank = (Bank) bf.getBean("bank");
+```
+只有区区几行代码与 Spring 相关的代码, 应用程序几乎完全与 Spring 分离, 消除了 EJB2 之类系统中那样紧耦合问题; 尽管 XML 可能会冗长且难以阅读, 配置文件中定义的 "策略" 还是要比那种隐藏在幕后自动创建的复杂的代理和方面逻辑来得更简单; EJB3 也很大程度上遵循了 Spring 通过描述性手段支持横贯式关注面的模型
+```
+// EJB3 版本的 Bank
+@Entity
+@Table(name = "BANKS")
+public class Bank implements java.io.Serializable {
+    @Id @GeneratedValue(strategy = GenerationType.AUTO)
+    private int id;
+    @Embeddable // An object inlined in Bank's DB row
+    public class Address {
+        protected String streetAddr1;
+        protected String streetAddr2;
+        protected String city;
+        protected String state;
+        protected String zipCode;
+    }
+
+    @Embedded
+    private Address address;
+
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER, mappedBy = "bank")
+    private Collection<Account> accounts = new ArrayList<Account>();
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public void addAccount(Account account) {
+        account.setBank(this);
+        accounts.add(account);
+    }
+
+    public Collection<Account> getAccounts() {
+        return accounts;
+    }
+
+    public void setAccounts(Collection<Account> accounts) {
+        this.accounts = accounts;
+    }
+}
+```
+以上代码比 EJB2 时已整洁许多, 有些实体细节仍然在 annotation 中存在; 但并没有任何信息超出 annotation 之外, 代码依然整洁, 清晰, 也易于测试驱动和维护; 如果愿意 annotation 中有些或全部持久化信息可以转移到 XML 部署描述中, 只留下真正的 POJO
+
+#### AspectJ 的方面
+通过方面来实现关注面切分额功能最全的工具是 AspectJ 语言, 一种提供一流的将方面作为模块构造处理支持的 Java 扩展, z在大部分用到方面特性的情况下, Spring AOP 和 JBoss AOP 提供的纯 Java 实现手段已足够, 然而 AspectJ 却提供了一套用于切分关注面的丰富而强有力的工具, AspectJ 的弱势在于需要采用几种新的工具, 学习新语言构造和使用方式
+
+#### 测试驱动系统架构
+最佳的系统架构由模块化的关注面领域组成, 每个关注面均用纯 Java (或其他语言) 对象实现, 不同领域之间用最不具有侵害性的方面或类方面工具整合起来; 这种架构能测试驱动, 就像代码一样
+
+#### 优化决策
+模块化和关注面切分成就了分散化管理和决策, 在巨大的系统中, 不管是一座城市或一个软件项目, 无人能做所有的决策; 拥有模块化关注面的 POJO 系统提供的敏捷能力, 允许基于最新的知识做出优化的, 时机刚好的决策, 决策的复杂性也降低了
+
+#### 明智使用添加可论证价值的标准
+TODO...
+
+#### 系统需要领域特定语言
+在软件领域, 领域特定语言 (Domain-Specific Language, DSL) 是一种单独的小型脚本语言或以标准语言写就的 API, 优秀的 DSL 填平了领域概念的代码之间的壕沟, 可以降低不正确将领域翻译为实现的风险
+
+#### 小结
+系统应该是整洁的, 侵害性架构会泯灭领域逻辑, 冲击敏捷能力; 当领域逻辑受到困扰, 代码质量也会堪忧, 因为缺陷更易隐藏, 用户故事更难实现; 当敏捷能力受到损害时, 生产力也会降低, TDD 的好处遗失殆尽
