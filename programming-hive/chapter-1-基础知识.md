@@ -7,6 +7,7 @@ HQL 和大多数 SQL 方言一样并不符合 ANSI SQL 标准, 其和 Oracle, My
 TODO
 
 #### Java 和 Hive: 词频统计算法
+TODO
 
 #### 后续事情
 我们描述了 Hive 在 Hadoop 生态系统中所扮演的重要角色, 现在我们开始!
