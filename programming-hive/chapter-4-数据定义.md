@@ -49,3 +49,73 @@ hive> create table if not exists mydb.employees2 like mydb.employees;
 ...
 
 ##### 外部分区表
+...
+创建非分区外部表时要求使用一个 location 子句, 对于外部分区表则没有这样的要求, alter table 语句可以单独进行增加分区
+...
+Hive 不关心一个分区对应的分区目录是否存在或者分区目录下是否有文件, 如果分区目录不存在或分区目录下没有文件, 则对于这个过滤分区的查询将没有返回结果
+...
+alter table ... add partition 语句并非只有对外部表才能够使用; 对于管理表, 当有分区数据不是由 load 或者 insert 语句产生时, 用户同样可以使用这个命令指定分区路径; 用户需要记住并非所有的表数据都是放在通常的 Hive 的 "warehouse" 目录下的, 同时当删除管理表时, 这些数据不会连带被删除掉! 因此, 从 "理智" 的角度来看, 是否敢于对管理表使用这个功能是一个问题
+
+##### 自定义表的存储格式
+Hive 的默认存储格式是文本文件格式, 这个也可以通过可选的子句 stored as textfile 显示指定
+...
+用户可以将 textfile 替换为其他 Hive 所支持的内置文件格式, 包括 sequencefile 和 rcfile, 这两种文件格式都是使用二进制编码和压缩 (可选) 来优化磁盘空间使用以及 I/O 带宽性能的
+...
+用户还可以指定第三方的输入和输出格式以及 serde, 这个功能允许用户自定义 Hive 本身不支持的其他广泛的文件格式
+...
+
+#### 删除表
+对于管理表, 表的元数据和表内的数据都会被删除; 对于外部表, 表的元数据信息会被删除, 但是表中的数据不会被删除
+
+#### 修改表
+大多数的表属性可以通过 alter table 语句来修改, 这种操作会修改元数据但不会修改数据本身; 这些语句可以修改表模式中出现的错误, 改变分区路径以及其他操作
+
+##### 表重命名
+```
+alter table log_message rename to logmsgs;
+```
+
+##### 增加, 修改和删除表分区
+TODO
+
+##### 修改列信息
+TODO
+
+##### 增加列
+TODO
+
+##### 删除或者替换列
+以下示例移除了之前所有的字段并重新制定了新的字段
+```
+alter table log_message replace columns (
+hours_mins_secs INT COMMENT 'hour, minute, seconds, from timestamp',
+severity STRING COMMENT 'the message serverity',
+message STRING COMMENT 'the rest of the message'
+);
+```
+这个语句实际上重命名了之前 hms 字段并且从之前表定义的模式中移除了字段 server 和 process_id, 因为是 alter 语句, 所以只有表的元数据变了  
+replace 语句只能用于使用了如下 2 种内置 serde 模块的表: DynamicSerDe 或者 MetadataTypedColumnsetSerDe
+
+##### 修改表属性
+TODO
+
+##### 修改存储属性
+TODO
+
+##### 众多的修改表语句
+- alter table ... touch
+```
+alter table log_message touch partition(yaer=2012, month=1, day=1);
+```
+partition 子句用于分区表, 这种语句的一个典型应用场景是, 当表中存储的文件在 Hive 之外被修改了, 就会触发钩子执行
+- alter table ... archive partition
+```
+alter table log_message archive partition(yaer=2012, month=1, day=1);
+```
+这个语句会将分区内的文件打成一个 Hadoop 压缩包 (HAR) 文件, 但是这样仅仅可以降低文件系统中的文件数以及减轻 namenode 的压力, 而不会减少任何的存储空间, 使用 unarchive 替换 archive 就可以反向操作, 这个功能只能用于分区表中独立的分区
+- alter table ... partition ... enable no_drop/offline
+```
+alter table log_message partition(yaer=2012, month=1, day=1) enable no_drop;
+alter table log_message partition(yaer=2012, month=1, day=1) enable offline;
+```
+这些语句可以防止分区被删除和被查询, 使用 disable 代替 enable 可以达到反向的目的, 这些操作也都不可用于非分区表
