@@ -81,3 +81,5 @@ Hive 支持所有典型的算术运算符
 |DOUBLE|sum(DISTINCT col)|计算排重后值的和|
 |DOUBLE|avg(col)|计算指定行的值的平均值|
 |DOUBLE|avg(DISTINCT col)|计算排重后的平均值|
+|DOUBLE|min(col)|计算指定行的最小值|
+|DOUBLE|max(col)|计算指定行的最大值|
