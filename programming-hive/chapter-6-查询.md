@@ -83,3 +83,16 @@ Hive 支持所有典型的算术运算符
 |DOUBLE|avg(DISTINCT col)|计算排重后的平均值|
 |DOUBLE|min(col)|计算指定行的最小值|
 |DOUBLE|max(col)|计算指定行的最大值|
+|DOUBLE|variance(col), var_pop(col)|返回集合 col 中的一组数值的方差|
+|DOUBLE|var_samp(col)|返回集合 col 中一组数值的样本方差|
+|DOUBLE|stddev_pop(col)|返回一组数值的标准偏差|
+|DOUBLE|stddev_samp(col)|返回一组数值的标准样本偏差|
+|DOUBLE|covar_pop(col1, col2)|返回一组数值的协方差|
+|DOUBLE|covar_samp(col1, col2)|返回一组数值的样本协方差|
+|DOUBLE|corr(col1, col2)|返回两组数值的相关系数|
+|DOUBLE|percentile(BIGINT int_expr, p)|int_expr 在 p (范围是: [0,1]) 处的对应百分比, 其中 p 是一个 DOUBLE 型数值|
+|ARRAY|percentile(BIGINT int_expr, ARRAY(p1[, p2] ...))|int_expr 在 p (范围是: [0,1]) 处的对应百分比, 其中 p 是一个 DOUBLE 型数组|
+|DOUBLE|percentile_approx(DOUBLE col, p[, NB])|col 是 p (范围是: [0,1]) 处的对应百分比, 其中 p 是一个 DOUBLE 型数值, NB 是用于估计的直方图中的仓库数量 (默认是 10000)|
+|ARRAY|percentile_approx(DOUBLE col, ARRAY(p1[, p2] ...)[, NB])|col 是 p (范围是: [0,1]) 处的对应百分比, 其中 p 是一个 DOUBLE 型数组, NB 是用于估计的直方图中的仓库数量 (默认是 10000)|
+|ARRAY<STRUCT{'x',''y}>|histogram_numeric(col, NB)|返回 NB 数量的直方图仓库数组, 返回结果中的值 x 是中心, 值 y 是仓库的高|
+|ARRAY|collect_set(col)|返回集合 col 元素排重后的数组|
