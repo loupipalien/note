@@ -96,3 +96,38 @@ Hive 支持所有典型的算术运算符
 |ARRAY|percentile_approx(DOUBLE col, ARRAY(p1[, p2] ...)[, NB])|col 是 p (范围是: [0,1]) 处的对应百分比, 其中 p 是一个 DOUBLE 型数组, NB 是用于估计的直方图中的仓库数量 (默认是 10000)|
 |ARRAY<STRUCT{'x',''y}>|histogram_numeric(col, NB)|返回 NB 数量的直方图仓库数组, 返回结果中的值 x 是中心, 值 y 是仓库的高|
 |ARRAY|collect_set(col)|返回集合 col 元素排重后的数组|
+
+通常, 可以通过设置属性 hive.map.aggr = true 来提高聚合性能,这个设置会触发在 map 阶段进行的 "顶级" 聚合过程 (非顶级的聚合过程会在执行一个 group by 后进行), 不过这个设置将需要更多的内存
+
+3. 表生成函数
+与聚合函数 "相反的" 一类函数就是所谓的表生成函数, 其可以将单列扩展成多列或者多行, 在使用表生成函数时, Hive 要求使用别名
+
+|返回值类型|样式|描述|
+|---|---|---|
+|N 行结果|explode(ARRAY array)|返回 0 到多行结果, 每行都对应输入 array 数组中的一个元素|
+|N 行结果|explode(MAP map)|返回 0 到多行结果, 每行对应每个 map 键值对, 其中一个字段是 map 的键, 另一个字段对应着 map 的值|
+|数组的类型|explode(ARRAY<TYPE> a)|对于 a 中的每个元素, explode() 会生成一行记录包含这个元素|
+|结果插入表中|inline(ARRAY<STRUCT[, STRUCT]>)|将结构体数组提取出来并插入到表中|
+|TUPLE|json_tuple(STRING jsonstr, p1, p2, ..., pn)|本函数可以接受多个标签名称, 对输入的 JSON 字符串进行处理, 与 get_json_object 这个 UDF 类似, 但是此函数更高效, 可以通过一次调用能获得多个键值|
+|TUPLE|parse_url_tuple(url, partname1, partname2, ..., partnameN), 其中 N > 1|从 URL 中解析出 N 个部分信息, 其输入参数是 URL, 以及多个要抽取的部分的名称; 所有输入的参数类型都是 STRING; 部分名称是大小写敏感的, 而且不应该包含有空格: HOST, PATH, QUERY, REF, PROTOCOL, AUTHORITY, FILE, USERINFO, QUERY<KEY NAME>|
+|N 行结果|stack(INT n, col1, ..., colM)|把 M 列转换为 N 行, 每行有 M / N 个字段, 其中 n 为常数|
+
+4. 其他内置函数
+TODO
+
+##### LIMIT 语句
+LIMIT 子句用于限制返回的行数
+
+##### 列别名
+
+##### 嵌套 SELECT 语句
+
+##### CASE ... WHEN ... THEN 句式
+case ... when ... then 语句和 if 语句类似, 用于处理单个列的查询结果
+
+##### 什么情况下 Hive 可以避免进行 MapReduce
+大多数情况下 Hive 查询都会触发一个 Mapreduce 任务, Hive 中对某些情况的查询可以不必使用 Mapreduce, 也就是所谓的本地模式， 如
+```
+select * from employees;
+```
+这种情况下, Hive 可以简单的读取 employees 对应的存储目录下的文件; 对于 where 语句中过滤条件只是分区字段的这种情况也是无需 MapReduce 过程的; 此外, 如果设置 hive.exec.mode.local.auto = true, Hive 还会尝试使用本地模式执行其他操作
