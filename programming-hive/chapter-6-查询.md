@@ -179,7 +179,7 @@ Hve 通常支持的是 SQL JOIN 语句, 但只支持等值连接
 ```
 select a.ymd, a.price_close, b.price_close
 from stocks a join stocks b on a.ymd <= b.ymd
-where a.symbol = 'AAPL' and b.symbol = 'IBM'
+where a.symbol = 'AAPL' and b.symbol = 'IBM';
 ```
 这个语句在 Hive 中是非法的, 主要原因是同通过 MapReduce 很难实现这种类型的连接, 同时 Hive 目前还不支持在 on 子句中的谓词间使用 or  
 ...
@@ -187,7 +187,7 @@ where a.symbol = 'AAPL' and b.symbol = 'IBM'
 ```
 select a.ymd, a.price_close, b.price_close, c.price_close
 from stocks a join stocks b on a.ymd <= b.ymd join stocks c on a.ymd = c.ymd
-where a.symbol = 'AAPL' and b.symbol = 'IBM' and c.symbol = 'GE'
+where a.symbol = 'AAPL' and b.symbol = 'IBM' and c.symbol = 'GE';
 ```
 大多数情况下, Hive 会对每对 join 连接对象启动一个 MapReduce 任务; 在本例中首先启动一个 MapReduce job 对表 a 和表 b 进行连接操作, 然后会再启动一个 MapReduce job 将第一个 MapReduce job 的输出表和表 c 进行连接操作
 
@@ -197,8 +197,8 @@ where a.symbol = 'AAPL' and b.symbol = 'IBM' and c.symbol = 'GE'
 幸运的是, 用户并非总是要将最大的表放置在查询语句的最后面的, 这是因为 Hive 还提供了一个 "标记" 机制来显式的告诉查询优化器那张表是大表
 ```
 select /*+ STREAMTABLE(s)*/ s.ymd, s.price_close, s.price_close, d.dividend
-from stocks s join dividend d on s.ymd = d.ymd and s.symbol = d.symbol
-where s.symbol = 'AAPL'
+from stocks s join dividends d on s.ymd = d.ymd and s.symbol = d.symbol
+where s.symbol = 'AAPL';
 ```
 Hive 将会尝试将表 stocks 作为驱动表, 即使其在查询中不是位于最后面的; 还有另外一个类似的非常重要的优化叫做 map-side JOIN
 
@@ -206,3 +206,57 @@ Hive 将会尝试将表 stocks 作为驱动表, 即使其在查询中不是位�
 左外连接通过关键字 LEFT OUTER 进行标识, 在这种 JOIN 连接操作中, JOIN 操作符左边表中符合 where 子句的所有记录将会被返回, JOIN 操作符右边表中如果没有符合 on 后面连接条件的记录时, 那么从右边表指定选择的列的值将会是 NULL
 
 ##### OUTER JOIN
+在 where 子句中增加分区过滤器可以加快查询速度, 对以下两张表的 exchange (分区) 字段增加谓词限定
+```
+select s.ymd, s.symbol, s.price_close, d.dividend
+from stocks s left outer join dividends d on s.ymd = d.ymd and s.symbol = d.symbol
+where s.symbol = 'AAPL' and s.exchange = 'NASDAQ' and d.exchange = 'NASDAQ';
+```
+以上语句的效果会发现和内连接是一样的, 这是因为先执行了 join 语句, 然后再将结果通过 where 语句进行过滤; 这样的结果并不想要的, 一个直接有效的解决方法是: 移除掉 where 语句中对 dividends 表的过滤条件, 也就是去掉 d.exchange = 'NASDAQ' 的这个限制条件; 但这样的运行效率不是令人满意的, Hive Wiki 中宣称 where 语句的 (分区) 过滤条件可以放在 on 语句中
+```
+select s.ymd, s.symbol, s.price_close, d.dividend
+from stocks s left outer join dividends d on s.ymd = d.ymd and s.symbol = d.symbol
+and s.symbol = 'AAPL' and s.exchange = 'NASDAQ' and d.exchange = 'NASDAQ';
+```
+但事实上, 对于外连接会忽略掉分区过滤条件, 对于内连接来讲这样确实是有效的  
+幸运的是, 有一个适用于所有种类连接的解决方案, 那就是使用嵌套 select 语句
+```
+select s.ymd, s.symbol, s.price_close, d.dividend from
+(select * from stocks where symbol = 'AAPL' and exchange = 'NASDAQ') s
+left outer join
+(select * from dividends where symbol = 'AAPL' and exchange = 'NASDAQ') d
+on s.ymd = d.ymd;
+```
+嵌套 select 语句会按照要求执行 "下推" 过程, 即在数据进行连接之前会先进行分区过滤
+
+##### RIGHT OUTER JOIN
+右连接会返回右边表所有符合 where 语句的记录, 左表匹配不上的字段值使用 NULL 代替
+
+##### FULL OUTER JOIN
+完全外连接将会返回所有表中符合 where 语句条件的所有记录, 如果任一表的指定字段没有符合条件的值的话, 那么就使用 NULL 值替代
+
+##### LEFT SEMI-JOIN
+左半开连接会返回左边表的记录, 前提是其记录对于右边表满足 on 语句中的判定条件; 以下语句将试图返回限定的股息支付日内的股票交易记录, 不过这个查询 Hive 是不支持的
+```
+select s.ymd, s.symbol, s.price_close from stocks s
+where s.ymd, s.symbol in (select d.ymd, d.symbol from dividends d);
+```
+不过可以使用如下的 left semi join 语句达到同样的目的
+```
+select s.ymd, s.symbol, s.price_close from stocks s
+left semi join dividends d on s.ymd = d.ymd and s.symbol = d.symbol;
+```
+但需要注意的是, select 和 where 语句中不能引用到右边表中的字段 (另外 Hive 不支持 RIGHT SEMI-JOIN); semi join 比通常的 inner join 要更高效, 原因是对于左边表中的一条指定记录, 在右边表中一旦找到匹配的记录, Hive 就会立即停止扫描, 从这点来看左边表选择的列是可预测的
+
+##### 笛卡儿积 JOIN
+笛卡儿积是一种连接, 表示左边表的行数乘以右边表的行数等于笛卡尔积结果集额大小
+```
+select * from stocks join dividends
+```
+笛卡尔积会产生大量的数据, 和其他连接类型不同, 笛卡儿积不是并行执行的, 而且使用 MapReduce 计算架构的话, 任何方式都无法进行优化; 如果使用了错误的连接语法可能会导致产生一个执行时间长, 运行缓慢的笛卡儿积查询, 例如以下查询
+```
+select * from stocks join dividends where s.symbol = 'AAPL' and s.symbol = d.symbol;
+```
+这个优化在很多数据库中会被优化成内连接 (inner join), 但是在 Hive 中没有这个优化, 因此会在 where 语句的过滤条件前先进行笛卡儿积计算, 这个过程会很消耗时间; 如果设置属性 hive.mapred.mode 的值为 strict 的话, Hive 会阻止用户执行笛卡儿积查询
+
+#####  MAP-SIDE JOIN
