@@ -155,3 +155,54 @@ where 语句中不能使用列别名
 |A IS NOT NULL|所有数据类型|如果 A 不等于 NULL 则返回 TRUE, 否则返回 FALSE|
 |A [NOT] LIKE B|STRING 类型|B 是一个 SQL 下的简单正则表达式, 如果 A 与其匹配的话, 则返回 TRUE, 否则返回 FALSE; B 的表达式说明如下: 'x%' 表示 A 必须是字母 x 开头, '%x' 表示 A 必须是字母 x 结尾, '%x%' 表示 A 包含有字母 x, 可以位于开头结尾或中间; 类似的下划线 '_' 匹配单个字符; B 必须要和整个字符串 A 匹配才行, 如果使用 NOT 关键字则可以达到相反的效果|
 |A RLIKE B, A REGEXP B|STRING 类型|B 是一个正则表达式, 如果 A 与其相匹配, 则返回 TRUE， 否则返回 FALSE; 匹配使用的是 JDK 中的正则表达式接口实现的, 因为正则规则也依据其中的规则; 正则表达式必须和整个字符串 A 相匹配|
+
+##### 关于浮点数比较
+浮点数比较的一个常见的陷阱出现在不同类型间作比较的时候 (也就是 FLOAT 和 DOUBLE 比较); 用户在写一个浮点数的时 (比如 0.2), Hive 会将改值保存为 DOUBLE 类型的, 当与 FLOAT 类型的的值比较时, 这意味着 Hive 将隐式的将其转换为 DOUBLE 类型后再比较; 但事实上这样是行不通的, 因为数字 (0.2) 不能够使用 FLOAT 或者 DOUBLE 进行准确比较, 0.2 的最近似的精确值应略大于 0.2, 也就是 0.2 后面的若干个 0 后存在的非零数值, 简化来说就是 0.2 对于 FLOAT 类型来说是 0.2000001, 而对于 DOUBLE 类型是 0.200000000001, 这是因为一个 8 字节的 DOUBLE z值具有更多的xiaoshuwe; 当 FLOAT 类型隐式转换为 DOUBLE 时变为 0.200000100000, 这个值实际要比 0.200000000001 大
+
+##### LIKE 和 RLIKE
+RLIKE 是支持正则表达式版的 LIKE  
+...
+
+##### GROUP BY 语句
+group by 语句通常会和聚合函数一起使用, 按照一个或多个列对结果进行分组, 然后对每个组执行聚合操作
+....
+
+##### HAVING 语句
+HAVING 子句允许用户通过一个简单的语法完成原本需要通过子查询才能对 group by 语句产生的分组进行条件过滤的任务  
+...
+
+#### JOIN 语句
+Hve 通常支持的是 SQL JOIN 语句, 但只支持等值连接
+
+##### INNER JOIN
+内连接中只有进行连接的两个表中都存在与连接标准相匹配的数据才会被保留下来; 标准额 SQL 是支持对连接关键词进行非等值连接的
+```
+select a.ymd, a.price_close, b.price_close
+from stocks a join stocks b on a.ymd <= b.ymd
+where a.symbol = 'AAPL' and b.symbol = 'IBM'
+```
+这个语句在 Hive 中是非法的, 主要原因是同通过 MapReduce 很难实现这种类型的连接, 同时 Hive 目前还不支持在 on 子句中的谓词间使用 or  
+...
+用户可以对多余 2 张表的多张表进行连接操作
+```
+select a.ymd, a.price_close, b.price_close, c.price_close
+from stocks a join stocks b on a.ymd <= b.ymd join stocks c on a.ymd = c.ymd
+where a.symbol = 'AAPL' and b.symbol = 'IBM' and c.symbol = 'GE'
+```
+大多数情况下, Hive 会对每对 join 连接对象启动一个 MapReduce 任务; 在本例中首先启动一个 MapReduce job 对表 a 和表 b 进行连接操作, 然后会再启动一个 MapReduce job 将第一个 MapReduce job 的输出表和表 c 进行连接操作
+
+##### JOIN 优化
+当对 3 个或者更多个表进行 JOIN 连接时, 如果每个 on 子句都使用相同的连接键的话, 那么只会产生一个 MapReduce job; Hive 同时假定查询中最后一个表是最大的那个表, 在对每行记录进行连接操作时, 它会尝试将其他表缓存起来, 然后扫描最后那个表进行计算, 因此用户需要保证连接查询中的表的大小从左到右是依次增加的  
+...  
+幸运的是, 用户并非总是要将最大的表放置在查询语句的最后面的, 这是因为 Hive 还提供了一个 "标记" 机制来显式的告诉查询优化器那张表是大表
+```
+select /*+ STREAMTABLE(s)*/ s.ymd, s.price_close, s.price_close, d.dividend
+from stocks s join dividend d on s.ymd = d.ymd and s.symbol = d.symbol
+where s.symbol = 'AAPL'
+```
+Hive 将会尝试将表 stocks 作为驱动表, 即使其在查询中不是位于最后面的; 还有另外一个类似的非常重要的优化叫做 map-side JOIN
+
+##### LEFT OUTER JOIN
+左外连接通过关键字 LEFT OUTER 进行标识, 在这种 JOIN 连接操作中, JOIN 操作符左边表中符合 where 子句的所有记录将会被返回, JOIN 操作符右边表中如果没有符合 on 后面连接条件的记录时, 那么从右边表指定选择的列的值将会是 NULL
+
+##### OUTER JOIN
