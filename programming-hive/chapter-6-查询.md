@@ -131,3 +131,27 @@ case ... when ... then 语句和 if 语句类似, 用于处理单个列的查询
 select * from employees;
 ```
 这种情况下, Hive 可以简单的读取 employees 对应的存储目录下的文件; 对于 where 语句中过滤条件只是分区字段的这种情况也是无需 MapReduce 过程的; 此外, 如果设置 hive.exec.mode.local.auto = true, Hive 还会尝试使用本地模式执行其他操作
+
+#### WHERE 语句
+select 语句用于选取字段, where 语句用于过滤条件, 两者结合使用可以查找到符合过滤条件的记录   
+,,,
+where 语句中不能使用列别名  
+...
+
+##### 谓词操作符
+
+|操作符|支持的数据类型|描述|
+|---|---|---|
+|A = B|基本数据类型|如果 A 等于 B 则返回 TRUE, 反之返回 FALSE|
+|A <=> B|基本数据类型|如果 A 和 B 都为 NULL 则返回 TRUE, 其他的和符号 (=) 操作符的结果一致, 如果任一为 NULL, 则结果为 BULL|
+|A == B|没有|错误的语法, SQL 使用 = 而不是 ==|
+|A <> B, A != B|基本数据类型|A 或者 B 为 NULL 则返回 NULL; 如果 A 不等于 B 则返回 TRUE, 否则返回 FALSE|
+|A < B|基本数据类型|A 或者 B 为 NULL 则返回 NULL; 如果 A 小于 B 则返回 TRUE, 否则返回 FALSE|
+|A <= B|基本数据类型|A 或者 B 为 NULL 则返回 NULL; 如果 A 小于或等于 B 则返回 TRUE, 否则返回 FALSE|
+|A > B|基本数据类型|A 或者 B 为 NULL 则返回 NULL; 如果 A 大于 B 则返回 TRUE, 否则返回 FALSE|
+|A >= B|基本数据类型|A 或者 B 为 NULL 则返回 NULL; 如果 A 大于或等于 B 则返回 TRUE, 否则返回 FALSE|
+|A [NOT] BETWEEN B AND C|基本数据类型|如果 A, B, C 任一为 NULL 则返回 NULL; 如果 A 的值大于或等于 B 而且小于或等于 C, 则返回 TRUE, 否则返回 TRUE; 使用关键字 NOT 则可达到相反的效果|
+|A IS NULL|所有数据类型|如果 A 等于 NULL 则返回 TRUE, 否则返回 FALSE|
+|A IS NOT NULL|所有数据类型|如果 A 不等于 NULL 则返回 TRUE, 否则返回 FALSE|
+|A [NOT] LIKE B|STRING 类型|B 是一个 SQL 下的简单正则表达式, 如果 A 与其匹配的话, 则返回 TRUE, 否则返回 FALSE; B 的表达式说明如下: 'x%' 表示 A 必须是字母 x 开头, '%x' 表示 A 必须是字母 x 结尾, '%x%' 表示 A 包含有字母 x, 可以位于开头结尾或中间; 类似的下划线 '_' 匹配单个字符; B 必须要和整个字符串 A 匹配才行, 如果使用 NOT 关键字则可以达到相反的效果|
+|A RLIKE B, A REGEXP B|STRING 类型|B 是一个正则表达式, 如果 A 与其相匹配, 则返回 TRUE， 否则返回 FALSE; 匹配使用的是 JDK 中的正则表达式接口实现的, 因为正则规则也依据其中的规则; 正则表达式必须和整个字符串 A 相匹配|
