@@ -196,7 +196,7 @@ where a.symbol = 'AAPL' and b.symbol = 'IBM' and c.symbol = 'GE';
 ...  
 幸运的是, 用户并非总是要将最大的表放置在查询语句的最后面的, 这是因为 Hive 还提供了一个 "标记" 机制来显式的告诉查询优化器那张表是大表
 ```
-select /*+ STREAMTABLE(s)*/ s.ymd, s.price_close, s.price_close, d.dividend
+select /*+ STREAMTABLE(s) */ s.ymd, s.price_close, s.price_close, d.dividend
 from stocks s join dividends d on s.ymd = d.ymd and s.symbol = d.symbol
 where s.symbol = 'AAPL';
 ```
@@ -260,3 +260,71 @@ select * from stocks join dividends where s.symbol = 'AAPL' and s.symbol = d.sym
 这个优化在很多数据库中会被优化成内连接 (inner join), 但是在 Hive 中没有这个优化, 因此会在 where 语句的过滤条件前先进行笛卡儿积计算, 这个过程会很消耗时间; 如果设置属性 hive.mapred.mode 的值为 strict 的话, Hive 会阻止用户执行笛卡儿积查询
 
 #####  MAP-SIDE JOIN
+如果所有表中只有一张表是小表, 那么可以在最大的表通过 mapper 的时候将小表完全放在内存中, Hive 可以在 map 端执行连接过程 (称为 map-side join), 这是因为 Hive 可以和内存中的小表进行逐一匹配, 从而省略掉常规连接操作所需要的 reduce 过程, 即使对于很小的数据集, 这个优化也明显地要快于常规的连接操作, 其不仅减少了 reduce 过程, 而且有时还可以同时减少 map 过程的执行步骤  
+在 Hive v0.7 的之前版本中如果想使用这个优化, 需要在查询语句中增加一个标记进行触发
+```
+select /*+ MAPJOIN(d) */ s.ymd, s.price_close, s.price_close, d.dividend
+from stocks s join dividends d on s.ymd = d.ymd and s.symbol = d.symbol
+where s.symbol = 'AAPL';
+```
+从 Hive v0.7 版本开始, 废弃了这种标记的方式, 不过如果增加了这个标记同样是有效的; 如果不加上这个标记, 那么这时用户需要设置属性 hive.auto.convert.join = true, 这样 Hive 才会在必要的时候启动这个优化, 默认情况下这个值是 false; 需要注意的是, 也可以配置能够使用这个优化的小表的大小, 如下是这个属性的默认值 (单位是字节) , hive.mapjoin.smalltable.filesize = 25000000; Hive 对于右外连接和全外连接不支持这个优化的  
+如果所有表中的数据是分桶的, 那么对于大表在特定的情况下同样可以使用这个优化; 即表中的数据必须是按照 on 语句中的键进行分桶的, 而且其中一张表的分桶的个数必须是另一张表分桶个数的若干倍; 当满足这些条件时, 那么 Hive 可以在 map 阶段按照分桶数据进行连接; 在这种情况下, 不需要先获取到表中所有的内容, 之后才去和另一张表中每个分桶进行匹配连接; 同样这个优化默认是没有开启, 需要设置参数 hive.optimize.bucketmapjoin = true; 如果涉及的分桶表都具有相同的分桶数, 而且数据是按照连接键或桶的键进行排序的, 那么这时 Hive 可以设置一个更快的分类-合并连接, 同样需要设置以下参数才可开启:
+```
+set hive.input.format = org.apache.hadoop.hive.ql.io.BucketizedHiveInputFormat;
+set hive.optimize.bucketmapjoin = true;
+set hive.optimize.bucketmapjoin.sortedmerge = true;
+```
+
+#### ORDER BY 和 SORT BY
+Hive 中 order by 语句和其他 SQL 方言一致, 会对查询结果集执行一个全局排序, 这也就是说会有一个所有的数据都通过一个 reducer 进行处理的过程, 对于大数据集这个过程可能很漫长  
+Hive 增加了一种可供选择的方式, 也就是 sort by, 其只会在每个 reducer 中对数据进行排序, 也就是执行一个局部排序的过程, 这样可以保证每个 reducer 的输出数据都是有序的 (但并非全局有序)  
+因为 order by 操作可能会导致运行时间很长, 如果属性 hive.mapred.mode = strict, 那么 Hive 要求这样的语句必须加油 limit 语句进行限制
+
+#### 含有 SORT BY 的 DISTRIBUTE BY
+distirbute by 控制 map 的输出在 reducer 中是如何划分的; 默认情况下, MapReduce 计算框架会依据 map 输入的键计算相应的哈希值, 然后按照得到的哈希值将键值对均匀分发到多个 reducer 中去; 但是不幸的是这意味着当使用 sort by 时, 不同 reducer 的输出内容会有明显的重叠, 至少对于排列顺序是这样的, 即使每个 reducer 的输出的数据都是有序的  
+以下语句使用的 distribute by 将相同的股票交易码的记录会分发到同一个 reducer 中进行处理, 然后再用 sort by 进行排序
+```
+select s.ymd, s.symbol, s.price_close from stocks s
+distribute by s.symbol sort by s.symbol asc, s.ymd asc
+```
+distribute by 和 group by 在其控制着 reducer 是如何接受一行行数据进行处理的方面是类似的; 需要注意的是, Hive 要求 distribute by 语句要在 sort by 语句之前
+
+#### CLUSTER BY
+在前面的例子中, 如果 distribute by 和 sort by 语句中涉及的列完全相同, 而且采用的是升序方式; 那么在这种情况下 CLUSTER BY 就等价于前面的两个语句, 相当于前面 2 个句子的一个简写方式
+```
+select s.ymd, s.symbol, s.price_close from stocks s cluster by s.symbol
+```
+使用 distribute by ... sort by 语句或简化版 cluster by 语句会剥夺 sort by 语句的并行性, 然而这样可以实现输出文件的数据是全局排序的
+
+#### 类型转换
+类型转换的语法是 cast(value as type), 当 value 是不合法的 type 值, Hive 将返回 NULL; 需要注意的是, 将浮点数转换成整数的推荐方式是 round(), floor()函数, 而不是使用类型转换操作符 cast
+
+###### 类型转换 BINARY 值
+Hive v0.8.0 版本中引入的 binary 类型的值只支持与 string 类型互转
+
+#### 抽样查询
+对于非常大的数据集, 有时候需要使用的是一个具有代表性的查询结果而不是全部结果; Hive 可以通过对表进行分桶抽样来满足这一需求  
+假设 numbers 表中只有 number 字段, 其值是 1 到 10
+```
+select * from numbers tablesample(bucket 1 out of 2 on number) s;
+```
+分桶语句中的分母表示的是数据将会被散列的桶的个数, 而分子表示将会选择的桶的个数
+
+##### 数据块抽样
+Hive 提供了另外一种按照抽样百分比进行抽样的方式, 这种是基于行数的, 按照输入路径下的数据块百分比进行的抽样
+```
+select * from numbersflat tablesample(0.1 percent) s;
+```
+基于百分比的抽样方式提供了一个 hive.sample.seednumber 的变量, 用于控制基于数据块的调优的种子信息
+
+##### 分桶表的输入裁剪
+如果 tablesample 语句中指定的列和 cluster by 语句中指定的列相同, 那么 tablesample 查询就只会扫描涉及到表的哈希分区下的数据
+```
+create table numbers_bucketed(number int) cluster by(number) into 3 buckets;
+set hive.enforce.bucketing = true;
+insert overwrite table numbers_bucketed select number from numbers;
+select * from numbers_bucketed tablesample(bucket 2 of 3 on number) s;
+```
+
+#### UNION ALL
+union all 可以将 2 个或多个表进行合并, 每一个 union 子查询都必需具有相同的列, 而且对应的每个字段的字段类型必须是一致的
