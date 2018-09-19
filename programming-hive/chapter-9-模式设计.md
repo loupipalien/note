@@ -27,3 +27,31 @@ insert overwrite table credits select * where action = 'returned';
 很多 ETL 处理过程会涉及到多个处理步骤, 每个步骤可能会产生一个或多个临时表, 这些表仅供下一个 job 使用; 对这些临时表进行分区可以避免在某一步出错时需要重新执行每一天分区数据的处理
 
 #### 分桶表数据存储
+分区提供了一个隔离数据和优化查询的便利方式, 但并非所有的数据集都可形成合理的分区; 当分区不合适时可能会造成很多小文件, 使用动态分区时由于 Hive 会限制创建最大分区数可能会失败; 那么则可以考虑进行分桶
+```
+create table weblog (user_id, int, url string, source_ip string)
+partition by (dt string)
+cluster by (user_id) into 96 buckets;
+```
+为了在分桶表中正确的插入数据, 我们需要设置一个属性来强制 Hive 为目标表的分桶初始化过程设置一个正确的 reducer 个数, 然后再执行一个查询来填充分区
+```
+set hive.enforce.bucketing = true;
+
+from raw_log
+insert overwrite table weblog
+partition (dt = '2009-09-25')
+select user_id, url, source_ip where dt = '2009-09-25';
+```
+如果没有使用 hive.enforce.bucketing 属性, 那么就需要设置和分通数相匹配的 reducer 个数; 即使用 set mapred.reduce.tasks = 96, 然后在 select 语句后增加 cluster by 语句
+
+#### 为表增加列
+Hive 允许在原始数据文件之上定义一个模式, 这样分离的好处是当为文件增加新的字段时, 可以很容易的适应表定义的模式; Hive 提供了 SerDe 抽象, 用于从输入中提取数据, SerDe 同样用于输出数据; 一个 SerDe 通常是从左到右进行解析的, 通过指定的分隔符将行分解成列; SerDe 通常是非常宽松的: 如果某行的字段个数比预期的要少, 那么缺少的字段将会返回 null, 如果某行的字段个数比预期的要多, 那么多处的字段将会被省略掉; 增加新的字段的命令只需要一条 alter table add column 就可以完成, 需要注意的是这种方式无法在已有字段的开始或中间增加字段
+
+#### 使用列存储表
+Hive 通常使用行式存储, 但也提供了一个列式的 SerDe 来以混合列式格式存储信息
+
+##### 重复数据
+TODO
+
+#### (几乎) 总是使用压缩
+几乎在所有情况下, 压缩都可以使磁盘上存储的数据量变小, 这样可以通过降低 I/O 来提高查询执行速度; MapReduce 任务往往是 I/O 密集型的, 因此 CPU 开销通常不是瓶颈
