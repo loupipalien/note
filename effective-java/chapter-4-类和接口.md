@@ -83,3 +83,84 @@ mixin 是指这样的类型: 类除了实现它的 "基本类型 (primary type)"
 骨架实现的美妙之处在于, 它们为抽象类提供了实现上的帮助, 但又不强加 "抽象类被用作类型定义" 所特有的严格限制; 对于接口的大多数实现来讲, 扩展骨架实现类是个很显然的选择, 但不是必需的; 如果预置类无法扩展骨架实现类, 这个类始终可以手工实现这个接口; 此外骨架实现类仍然能够有助于接口的实现, 实现了这个接口的类可以把对这个接口方法的调用转发到一个内部私有类的实例上, 这个内部私有类扩展了骨架实现类, 这种方法方法被称为模拟多重继承; 编写骨架实现类相对比较简单, 必须认真研究接口, 并确定哪些方法是最为基本的, 其他方法则可以根据它们来实现, 这些基本方法将成为骨架实现类中的抽象方法; 因为骨架实现类是为了继承的目的设计的, 所以需要遵循第 17 条中的原则  
 使用抽象类来定义多个实现的类型, 与使用接口相比有一个明显的优势: 抽象类的演变比接口的演变要容易的多, 在后续的发行版本中, 始终都可以增加具体的方法, 对于接口则行不通; 想要在公有接口中增加方法, 而不破坏这个接口的所有实现类是不可能的, 所以必须保证接口初次设计就是正确的  
 简而言之, 接口通常是定义允许多个实现的类型的最佳途径, 但这条规则有个例外, 即当演变的容易性比灵活性和功能更为重要的时候, 应该使用抽象类来定义类型, 但前提是必须理解并可以接受其局限性
+
+#### 第 19 条: 接口只用于定义类型
+当类实现接口时, 接口就充当可以引用这个类的实例的类型, 因此类实现了接口就表明客户端可以对这个类的实例实施某些动作, 为了其他任何目的而定义接口是不恰当的  
+常量接口模式是对接口的不良使用, 类在内部使用某些常量属于实现细节, 实现常量接口会导致把这样的实现细节泄露到该类的导出 API 中; 如果导出常量可以考虑以下几种方案
+- 如果这些常量与某个现有的类或者接口紧密相关, 就应该把这些常量添加到这个类或者接口中
+- 如果这些常量可以被看做枚举成员, 就应该使用枚举
+- 否则就应该使用不可实例化工具类
+
+简而言之, 接口应该只被用来定义类型, 而不应该被用来导出常量
+
+#### 第 20 条: 类层次优于标签类
+```
+// Tagged class
+class Figure {
+    enum Shape {RECTANGE, CIRCLE};
+
+    final Shape shape;
+
+    double length;
+    double width;
+
+    double radius;
+
+    Figure(double length, double width) {
+        shape = Shape.RECTANGE;
+        this.length = length;
+        this.width = width;
+    }
+
+    Figure(double radius) {
+        shape = shape.CIRCLE;
+        this.radius = radius;
+    }
+
+    double area() {
+        switch(shape) {
+            case RECTANGE:
+                return length * width;
+            case CIRCLE:
+                return Math.PI * (radius * radius);
+            default:
+                throw new AssertionError();
+        }
+    }
+}
+```
+这样的标签类充斥着样板代码, 包括枚举声明, 标签域以及条件语句, 破坏了可读性, 并且内存占用增加了; 标签类过于冗长, 容易出错且效率低下; 在 Java 应该避免标签类而使用类层次处理
+```
+abstract class Figure {
+    abstract double area();
+}
+
+class Rectange extends Figure {
+    final double length;
+    final double width;
+
+    Rectange(double length, double width) {
+        this.length = length;
+        this.width = width;
+    }
+
+    double area() {
+        return length * width;
+    }
+}
+
+class Circle extends Figure {
+    final double radius;
+
+    Circle(double radius) {
+        this.radius = radius;
+    }
+
+    double area() {
+        return Math.PI * (radius * radius);
+    }
+}
+```
+类层次的另一种好处是, 可以用来反映类型之间本质上的层次关系, 有助于增强灵活性, 并进行更好的编译时类型检查
+
+#### 用函数对象表示策略
