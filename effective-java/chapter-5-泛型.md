@@ -21,3 +21,21 @@
 |有限制通配符类型|List<? extends Number>|第 28 条|
 |泛型方法|static <E> List<E> asList(E[] a)|第 27 条|
 |类型令牌|String.class|第 29 条|
+
+#### 第 24 条: 消除非受检警告
+用泛型编程时, 会遇到许多编译器的警告: 非受检强制转化警告 (unchecked cast warings), 非受检方法调用警告, 非受检普通数组创建警告, 非受检转换警告 (unchecked conversion warnings); 要尽可能到消除这些警告, 以保证代码类型安全, 确保不会在运行时出现 ClassCastException 异常, 如果无法消除警告, 同时可以证明引起警告的代码是类型安全的, 这种情况下才可以用一个 @SupressWarings("unchecked") 注解禁止这条警告  
+@SupressWarings 注解可以用在任何粒度的级别中, 从单独的局部变量声明到整个类都可以, 但应该始终尽可能小的范围中使用 @SupressWarings 注解, 通常是在变量上或者方法上, 尽量不要在整个类上使用, 这样可能掩盖了重要的警告; 每当使用 @SupressWarings("unchecked") 注解时, 都要添加一条注解, 说明这样做为什么是安全的, 帮助阅读代码
+
+#### 第 25 条: 列表优先于数组
+数组与泛型相比有两个重要的不同点; 首先数组是协变的 (covariant): 表示如果 Sub 为 Super 的子类型, 那么数组类型 Sub[] 是 Super[] 的子类型; 相反, 泛型是不可变的 (invariant): 对于任意两个不同类型 Type1 和 Type2, List<Type1> 即不是 List<Type2> 的子类型, 也不是 List<Type2> 的超类型; 实际上数组是有缺陷的, 以下两种都不能将 String 放入 Long 容器中, 但是数组在运行时才报错, 而泛型在编译时即报错
+```
+// Fails at runtime
+Object[] objectArray = new Long[1];
+objectArray[0] = "I don't fit in" // Throws ArrayStoreException
+
+// Won't compile
+List<Object> ol = new Arraylist<Long>(); // Incompatible types
+ol.add("I don't fit in");
+```
+数组与泛型之间的第二大区别在于, 数组是具体化的, 因此数组会在运行时才知道并检查它们的元素类型约束; 如上所述, 企图将 String 保存到 Long 数组中会得到一个 ArrrayStoreException 异常; 相比之下, 泛型是通过擦除来实现的, 在编译时强化它们的类型信息, 并在运行时丢弃它们的类型信息  
+由于以上区别, 数组和泛型不能很好的混用, 如创建泛型, 参数化类型或者类型参数的数组是非法的, new List<E>[], new List<String>[], new E[] 都是非法的, 编译时都会导致一个 generic array creation (泛型数组创建) 错误
