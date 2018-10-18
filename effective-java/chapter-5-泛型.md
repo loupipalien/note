@@ -38,4 +38,20 @@ List<Object> ol = new Arraylist<Long>(); // Incompatible types
 ol.add("I don't fit in");
 ```
 数组与泛型之间的第二大区别在于, 数组是具体化的, 因此数组会在运行时才知道并检查它们的元素类型约束; 如上所述, 企图将 String 保存到 Long 数组中会得到一个 ArrrayStoreException 异常; 相比之下, 泛型是通过擦除来实现的, 在编译时强化它们的类型信息, 并在运行时丢弃它们的类型信息  
-由于以上区别, 数组和泛型不能很好的混用, 如创建泛型, 参数化类型或者类型参数的数组是非法的, new List<E>[], new List<String>[], new E[] 都是非法的, 编译时都会导致一个 generic array creation (泛型数组创建) 错误
+由于以上区别, 数组和泛型不能很好的混用, 如创建泛型, 参数化类型或者类型参数的数组是非法的, new List<E>[], new List<String>[], new E[] 都是非法的, 编译时都会导致一个 generic array creation (泛型数组创建) 错误; 创建泛型数组是非法的, 因为它不是类型安全的; 如果它合法, 那么编译器在其他正确的程序中发生的转换就会在运行时失败, 并出现一个 ClassCastException 异常, 这就违背了泛型系统提供的基本保证; 见以下示例代码片段
+```
+// Why generic array creation is illegal - won't compile
+
+// 如果创建泛型数组是合法的
+List<String>[] stringlists = new List<String>[1];
+// 创建并初始化了一个包含单个元素的 List<Integer>
+List<Integer> intList = Arrays.asList(42);
+// 将 List<String> 数组保存到 Object 数组中, 因为泛型擦除, 并且数组是协变的, 所以是合法的
+Object[] objects = stringLists;
+// 将 List<Integer> 保存到 Object 数组中, 因为泛型擦除, List<Integer> 实例保存到 List<String>[] 不会抛出 ArrayStoreException 异常
+objects[0] = intList;
+// 抛出 ClassCastException 异常
+String s = stringLists[0].get(0);
+```
+所以为了防止这种情况出现, (创建泛型数组) 第一行产生了一个编译时错误  
+从技术的角度来说, E, List<E>, List<String> 这样的类型应称作不可以具体化的类型, 不可具体化类型是指其运行时表示fa所包含的信息比它编译时表示法包含的信息更少的类型; 唯一可具体化的参数类型是无限制的通配符类型 (如 List<?>, Map<?,?>), 虽不常用, 但是创建无限制通配类型的数组是合法的
