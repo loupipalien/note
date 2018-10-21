@@ -114,3 +114,114 @@ static Object reduce(List<E> list, Function<E> f, E initVal) {
 总而言之, 数组和泛型有着非常不同的类型规则, 数组是协变且具体化的, 泛型是不可变的且可以擦除的; 因此数组提供了运行时的类型安全, 但是没有编译时的类型安全; 一般来说, 数组和泛型不能很好的混用, 如果发现混起来用得到了编译时错误或者警告, 第一反应应该是用列表代替数组
 
 #### 第 26 条: 优先考虑泛型
+简单的堆栈实现
+```
+// Object-based collection - a prime cnadidate for generics
+public class stack  {
+    private Object[] elements;
+    private int size = 0;
+    private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+    public Stack() {
+       elements = new Object[DEFAULT_INITIAL_CAPACITY];
+    }
+
+    public void push(Object e) {
+        ensureCapacity();
+        elements[size++] = e;
+    }
+
+    public Object pop() {
+        if (size == 0) {
+            throw new EmptyStackException();
+        }
+        Object result = elements[--size];
+        elements[size] = null; // Eliminate obsolete reference
+        return result;
+    }
+
+    public boolean siEmpty() {
+        retrun size == 0;
+    }
+
+    private void ensureCapacity() {
+        if (elements.length == size) {
+            elements = Arrays.copyOf(elements, 2 * size + 1);
+        }
+    }
+}
+```
+泛型实现
+```
+// Initial attempt to generify Stack - won't compile
+public class stack<E>  {
+    private E[] elements;
+    private int size = 0;
+    private static final int DEFAULT_INITIAL_CAPACITY = 16;
+
+    public Stack() {
+        // generic array creation
+        elements =  new E[DEFAULT_INITIAL_CAPACITY];
+    }
+
+    public void push(E e) {
+        ensureCapacity();
+        elements[size++] = e;
+    }
+
+    public E pop() {
+        if (size == 0) {
+            throw new EmptyStackException();
+        }
+        E result = elements[--size];
+        elements[size] = null;
+        return result;
+    }
+
+    public boolean siEmpty() {
+        retrun size == 0;
+    }
+
+    private void ensureCapacity() {
+        if (elements.length == size) {
+            elements = Arrays.copyOf(elements, 2 * size + 1);
+        }
+    }
+}
+```
+以上代码在泛型数组创建时会报错, 因为不可创建不可具体化类型的数组; 解决这个问题通常有两种办法, 第一种是直接绕过创建泛型数组的禁令, 创建一个 Object 数组然后在转换为泛型数组
+```
+/**
+ * The elements array will contain only E instances from push(E),
+ * this is sufficient to ensure type safety, but the runtime type of
+ * the array won't be E[], it will always be Object[]!
+ */
+@SuppressWaring("unchecked")
+public Stack() {
+    elements =  (E[]) new E[DEFAULT_INITIAL_CAPACITY];
+}
+```
+消除 Stack 中泛型数组创建错误的第二种方法是, 将 elements 域的类型从 E[] 改为 Object[]; 这样需要将类型转换的警告放在变量上, 因为 E 是一个不可具体化的类, 编译器无法在运行时检验转换
+```
+public E pop() {
+    if (size == 0) {
+        throw new EmptyStackException();
+    }
+    /*
+     * push required elements to be of type E, so cast is correct
+     */
+    @SuppressWaring("unchecked")
+    E result = (E) elements[--size];
+    elements[size] = null;
+    return result;
+}
+```
+具体选择哪种处理方式主要肯个人偏好; 但禁止数组类型的未受检转换比变量类型转换更加危险, 所以建议采用第二种方案; 但是在实际 Stack 代码中需要变量转换的地方太多, 反而第一种方案更常用  
+有一些泛型限制了可允许的类型参数值, 例如 java.util.concurrent.Delayed 的一个子类型, 其声明如下
+```
+class DelayQueue<E extends Delayed> implements BlockingQueue<E>;
+```
+类型参数列表 (<E extends Delayed>) 要求实际的参数 E 必须是 java.util.concurrent.Delayed 的一个子类型, 它允许 DelayQueue 实现及客户端 DelayQueue 的元素上利用 Delayed 方法, 无需显式转换, 也没有出现 ClassCastException 的风险; 类型参数 E 被称作有限制的类型参数 (bounded type parameter)  
+总而言之, 使用泛型比使用需要的在客户端代码中进行转换的类型来得更安全, 也更加容易; 再设计类型的时候, 确保它们不需要转换就可以使用
+
+#### 第 27 条: 优先考虑泛型方法
