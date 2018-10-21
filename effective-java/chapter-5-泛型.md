@@ -225,3 +225,42 @@ class DelayQueue<E extends Delayed> implements BlockingQueue<E>;
 总而言之, 使用泛型比使用需要的在客户端代码中进行转换的类型来得更安全, 也更加容易; 再设计类型的时候, 确保它们不需要转换就可以使用
 
 #### 第 27 条: 优先考虑泛型方法
+就如同可以从泛型类中收益一样, 静态工具方法尤其适合于泛型化, Collections 类中的所有 "算法" 方法都被泛型化了; 泛型方法的一个显著特性是, 无需明确指定类型参数的值, 不像调用泛型构造器的时候是必须指定的; 编译器通过检查方法参数的类型来计算类型参数的值  
+有时需要创建不可变但又适合许多不同类型的对象, 由于泛型是通过擦除实现的, 可以给所有必要的类型参数使用单个对象, 但是需要编写一个静态工厂方法, 重复的给每个必要的类型参数分发对象; 这种模式叫做泛型单例模式, 最常用于函数对象  
+假设现在有一个接口, 描述了一个方法, 该方法接受和返回某个类型 T 的值; 现在假设提供一个恒等函数, 如果在每次需要的时候重新创建一个会很浪费, 因为它是无状态的, 如果泛型被具体化了, 每个类型都需要一个恒等函数, 但是它们被擦除后就只需要一个泛型单例
+```
+public interface UnaryFunction<T> {
+    T apply(T arg);
+}
+
+// private static factory pattern
+private static UnaryFunction<Object> IDENTITY_FUNCTION = new UnaryFunction<Object>() {
+    public Object apply(Object arg) {
+        return arg;
+    }
+}
+
+/*
+ * IDENTITY_FUNCTION is stateless and its type parameter is unbouned,
+ * so it's safe to share one instance across all types
+ */
+@SuppressWaring("unchecked")
+public static <T> UnaryFunction<T> identityFunction() {
+    return (UnaryFunction<T>) IDENTITY_FUNCTION;
+}
+```
+IDENTITY_FUNCTION 转换成 (UnaryFunction<T>), 产生了一条未收件的转换警告, 因为 UnaryFunction<Object> 对于每个 T 来说并非都是 UnaryFunction<T>, 但是恒等函数很特殊: 它返回未被修改的参数, 因此无论 T 是什么值, 用其作为 UnaryFunction<T> 都是类型安全的  
+通过某个包含该类型参数本身的表达式来限制类型参数是允许的, 这就是递归类型限制 (recursive type bound); 递归类型限制最普遍的用途与 Comparable 接口有关, 它定义类型的自然顺序:
+```
+public interface Comparable<T> {
+    int compareTo(T o);
+}
+```
+类型参数 T 定义的类型, 可以与实现 Comparable<T> 类型的元素进行比较; 实际上几乎所有的类型都只能与它们自身的类型的元素比较
+```
+// Using a recursive type bound to express mutual Comparability
+public static <T extends Comparable<T>> T max(List<T> list) {...}
+```
+类型限制 <T extends Comparable<T>>, 可以读作 "针对可以与自身进行比较的每个类型 T"; 递归类型限制可能比这个要复杂的多, 但幸运的是这种情况并不常发生; 如果理解了这种习惯用法及其通配符变量 (见第 28 条), 就能够处理在实践中遇到的许多递归类型限制了
+
+#### 第 28 条: 利用有限制通配符来提升 API 的灵活性
