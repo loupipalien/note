@@ -54,6 +54,63 @@ objects[0] = intList;
 String s = stringLists[0].get(0);
 ```
 所以为了防止这种情况出现, (创建泛型数组) 第一行产生了一个编译时错误  
-从技术的角度来说, E, List<E>, List<String> 这样的类型应称作不可以具体化的类型, 不可具体化类型是指其运行时表示fa所包含的信息比它编译时表示法包含的信息更少的类型; 唯一可具体化的参数类型是无限制的通配符类型 (如 List<?>, Map<?,?>), 虽不常用, 但是创建无限制通配类型的数组是合法的
+从技术的角度来说, E, List<E>, List<String> 这样的类型应称作不可以具体化的类型, 不可具体化类型是指其运行时表示fa所包含的信息比它编译时表示法包含的信息更少的类型; 唯一可具体化的参数类型是无限制的通配符类型 (如 List<?>, Map<?,?>), 虽不常用, 但是创建无限制通配类型的数组是合法的; 当泛型数组创建错误时最好的解决办法通常是优先使用集合类型 List<E>, 而不是数组类型 E[], 这样可能会损失一些性能或者简洁性, 但是换回的是更高的类型安全和互用性  
+假设有一个 (Collections.synchronizedList 返回的那种) 同步列表和一个函数 (它有两个与该列的元素同类型的参数值, 并返回第三个值), 现在假设要编写一个方法 reduce, 并使用函数 apply 来处理这个列表
+```
+// Reduction without generics, and with concurrency flaw!
+static Object reduce(List list, Function f, Object initVal) {
+    synchronized(list) {
+        Object reduce = initVal;
+        for (Object o : list) {
+            result = f.apply(result, o);
+        }
+        return result;
+    }
+}
 
-#### 
+interface Function {
+    Object apply(Object arg1, Object arg2);
+}
+```
+假设现在已经读过第 67 条, 它告诉你不要从同步区域中调用 "外来的 (alien)" 方法, 在持有锁的时候修改 reduce 方法来复制表中的内容, 也可以让你在备份上执行减法; 在 JDK5 发行版本之前, 要这么做一般是利用 List 的 toArray 方法 (它在内部锁定列表)
+```
+// Reduction without generics or concurrency flaw
+static Object reduce(List list, Function f, Object initVal) {
+    synchronized(list) {
+        Object[] snapshot = list.toArray() // Locks list internally
+        Object reduce = initVal;
+        for (Object o : snapshot) {
+            result = f.apply(result, o);
+        }
+        return result;
+    }
+}
+```
+如果试图通过泛型来完成这一点, 就会遇到一些警告的麻烦; 以下是 Function 接口的泛型版
+```
+interface Function<T> {
+    T apply(T arg1, T arg2);
+}
+
+// Naive generics version of reduction -
+
+static Object reduce(List<E> list, Function<E> f, E initVal) {
+    /**
+    * E[] snapshot = list.toArray() // Naive generics version of reduction - won't  compile
+    * E[] snapshot = (E[]) list.toArray() // Naive generics version of reduction - unchecked cast
+    */
+    List<E> snapshot;
+    synchronized (list) {
+        snapshot = new Arraylist<E>(list);
+    }
+    E reduce = initVal;
+    for (E o : snapshot) {
+        result = f.apply(result, o);
+    }
+    return result;
+}
+```
+使用列表转换虽然代码更冗长一些, 但是可以确定在运行时不会得到 ClassCastException 异常  
+总而言之, 数组和泛型有着非常不同的类型规则, 数组是协变且具体化的, 泛型是不可变的且可以擦除的; 因此数组提供了运行时的类型安全, 但是没有编译时的类型安全; 一般来说, 数组和泛型不能很好的混用, 如果发现混起来用得到了编译时错误或者警告, 第一反应应该是用列表代替数组
+
+#### 第 26 条: 优先考虑泛型
