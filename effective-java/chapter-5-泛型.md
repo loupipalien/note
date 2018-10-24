@@ -346,4 +346,7 @@ private static <E> void swapHelper(List<E> list, int i, int j) {
     list.set(i, list.set(j, list.get(i)));
 }
 ```
-这样虽然有些复杂, 但是导出 swap 比较好的基于通配符的声明, 同时在内部利用更复杂的泛型方法 (感觉一开始泛型方法就挺好)
+这样虽然有些复杂, 但是导出 swap 比较好的基于通配符的声明, 同时在内部利用更复杂的泛型方法 (感觉一开始泛型方法就挺好...)  
+泛型方法的基本原则: producer-extends, consumer-super (PECS), 以及所有的 Comparable 和 Comparator 都是消费者
+
+#### 第 29 条: 优先考虑类型安全的异构容器
