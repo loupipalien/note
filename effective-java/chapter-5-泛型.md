@@ -350,3 +350,4 @@ private static <E> void swapHelper(List<E> list, int i, int j) {
 泛型方法的基本原则: producer-extends, consumer-super (PECS), 以及所有的 Comparable 和 Comparator 都是消费者
 
 #### 第 29 条: 优先考虑类型安全的异构容器
+泛型最常用于集合, 如 Set 和 Map, 以及单元素的容器, 如 ThreadLocal 和 AtomicReference
