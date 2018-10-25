@@ -350,4 +350,25 @@ private static <E> void swapHelper(List<E> list, int i, int j) {
 泛型方法的基本原则: producer-extends, consumer-super (PECS), 以及所有的 Comparable 和 Comparator 都是消费者
 
 #### 第 29 条: 优先考虑类型安全的异构容器
-泛型最常用于集合, 如 Set 和 Map, 以及单元素的容器, 如 ThreadLocal 和 AtomicReference
+泛型最常用于集合, 如 Set 和 Map, 以及单元素的容器, 如 ThreadLocal 和 AtomicReference; 在这些用法中, 它都充当了被参数化了的容器, 这样就限制了每个容器只能有固定数目的类型参数; 但是有时候会需要更多的灵活性, 例如数据库行可以有任意多的列, 如果能以类型安全的方式访问所有列就好了; 幸运的是, 有一种方法可以很容易的做到这一点, 即将键进行参数化而不是将容器进行参数化, 然后将参数化的键提交给容器来插入或者获取值, 用泛型系统来确保值的类型与它的键相符
+```
+// Typesafe heterogeneous container pattern - implmentation
+public class Favorites {
+    private Map<Class<?>,Object> favorites = new HashMap<Class<?>,Object>();
+
+    // Achieving runtime type safety with a dynamic cast
+    public <T> void putFavorite(Class<T> type, T instance) {
+        if (type == null) {
+            throw new NullPointerException("Type is null");
+        }
+        favorites.put(type, type.cast(instance));
+    }
+
+    pubic <T> T getFavorite(Class<T> type) {
+        return type.cast(favorites.get(type));
+    }
+}
+```
+Favorites 实例是类型安全的, 同时它也是异构的: 不像普通的 map, 它的所有键都是不同类型的; 称 Favorites 为类型安全的异构容器; 但是 Favorites 还是有它的局限性, 即它不可以用在不可具体化的类型中, 即可以用来保存 String 或者 String[], 但是不能用来保存 List<String>, 因为无法获得 List<String> 的 Class 对象; 对于此局限性有一种称为 super type token 的方法, 在为解决此问题做了努力, 但然后有它自身的局限性  
+
+TODO
