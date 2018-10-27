@@ -46,3 +46,5 @@ public enum Operation {
 }
 ```
 此外, 枚举类型还有一个自动产生的 valueOf(String) 方法, 它将常量的名字转变成常量本身; 如果在枚举类型中覆盖了 toString, 要考虑编写一个 fromString 方法, 将定制的字符串方法变回相应的枚举
+
+#### 
