@@ -78,4 +78,89 @@ public enum Ensemble {
 ```
 Enum 的 ordinal 方法注释中写道: 大多数程序员将不会使用到这个方法, 它是设计为像 EnumSet 和 EnumMap 这种基于枚举的通用数据结构的; 所以除非编写的是这种数据结构的代码, 否则最好完全避免使用 ordinal 方法
 
-#### 
+#### 用 EnumSet 代替位域
+如果一个枚举类型主要用在集合中, 一般就使用 int 枚举模式, 将 2 的不同倍数赋予每个常量
+```
+// Bit field enumeration constants - OBSOLETE
+public class Text {
+    public static final int STYLE_BOLD = 1 << 0; // 1
+    public static final int STYLE_ITALIC = 1 << 1; // 2
+    public static final int STYLE_UNDERLINE = 1 << 2; // 4
+    public static final int STYLE_STRIKETHROUGH = 1 << 3; // 8
+
+    // parameter is bitwise OR of zero or more STYLE_ constants
+    public void applyStyles(int styles) {
+        ...
+    }
+}
+```
+位域表示法也允许利用位操作, 有效的执行像 union 和 intersection 这样集合操作, 但位域有着 int 枚举常量所有的缺点; 其实有更好的替代方法, java.util 包提供了 EnumSet 类来有效地表示从单个枚举类型中提取多个值的集合; 这个类实现了 Set 接口, 提供了丰富的功能, 类型安全性以及可以从任何其他 Set 实现中得到的互用性; 但是在内部具体的实现上, 每个 EnumSet 内容都表示为位矢量; 如果底层的枚举类型有 64 个或者更少的元素 (大多如此), 整个 EnumSet 就是用单个 long 来表示的, 因此它的性能比得上位域的性能
+```
+// EnumSet - a modern replacement for bit fields
+public class Text {
+    public enum Style {BOLD, ITALIC, UNDERLIEN, STRIKETHROUGH}
+
+    // Any set could be passed in, but EnumSet is clearly best
+    public void applyStyles(Set<Style> styles) {
+        ...
+    }
+}
+```
+下面是将 EnumSet 实例传递给 applyStyles 方法的客户端代码, EnumSet 提供了丰富的静态工厂来轻松的创建集合
+```
+text.applyStyles(EnumSet.of(Style.BOLD, Style.ITALIC));
+```
+总而言之, 正是因为枚举类型要用在集合中, 所以没有道理用位域来表示它, EnumSet 类集位域的简洁和性能优势以及第 30 条中所述的枚举类型优势于一身; 但实际上 EnumSet 有个缺点, 即无法创建不可变的 EnumSet, 但可以用 collections.unmodifiableSet 将其封装, 当简洁性和性能会受到影响
+
+#### 用 EnumMap 代替序数索引
+有时可能会见到利用 ordinal 方法来索引数组的代码, 例如以下
+```
+public class Herb {
+    public enum Type {ANNUAL, PERENNIAL, BIENNIAL}
+
+    ptivate final String name;
+    private final Type type;
+
+    Herb(String name, Type type) {
+        this.name = name;
+        this.type = type;
+    }
+
+    @override
+    public String toString() {
+        return name;
+    }
+}
+```
+现在假设有一个香草的数组, 表示一座花园中的植物, 如果想要按照类型 (一年生, 两年生, 多年生) 进行组织只有将这些植物列出来, 这样需要构建三个集合, 每种类型一个, 然后变量整个花园, 将每个香草放到相应的集合中
+```
+// Using ordinal() to index an array - DON'T DO THIS
+Herb[] garden = ...;
+Set<Herb>[] herbsByType = (Set<Herb>[]) new Set[Herb.Type.values().length];
+for(int i = 0; i < herbsByType.length; i++) {
+    herbsByType[i] = new HashSet<Herb>();
+}
+for(Herb h : garden) {
+    herbsByType[h.type.ordinal()].add(h);
+}
+// Print
+for(int i = 0; i < herbsByType.length; i++) {
+   System.out.printf("%s: %s%n", Herb.Type.values()[i], herbsByType[i])
+}
+```
+这种方法的确可行, 但是隐藏着许多问题, 因为数组和泛型不能兼容, 程序需要进行未受检的转换, 并且不能正确无误地进行编译, 因为数组不知道它的索引代表着什么, 必须手工标注这些索引的输出; 有一种专门用于枚举键且非常快速的 Map 可以代替数组充当从枚举到值的映射, 即 java.util,EnumMap
+```
+// Using an EnumMap to associate date with an enum
+Map<Herb.Type,Set<Herb>> herbsByType = new EnumMap<>(Herb.Type.class);
+for(Herb.Type t : Herb.Type.values()) {
+    herbsByType.put(t, new HashSet<>());
+}
+for(Herb h : garden) {
+    herbsByType.get(h.type).add(h);
+}
+System.out.println(herbsByType);
+```
+这段程序更简短, 更清楚也更加安全, 运行速度方面可以与使用序数的程序媲美; EnumMap 在运行速度上之所以能与通过序数索引的数组相媲美, 是因为 EnumMap 在内部使用了这种数组, 但是它对程序员隐藏了这种实现细节, 集 Map 的丰富功能和类型安全与数组的快速于一身; 注意 EnumMap 构造器采用键类型的 Class 对象: 这时一个有限制的类型令牌, 它提供了运行时的泛型信息  
+总而言之, 最好不要用序数来索引数组, 而要使用 EnumMap
+
+#### 第 34 条: 用接口模拟可伸缩的枚举
