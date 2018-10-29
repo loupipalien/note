@@ -45,6 +45,37 @@ public enum Operation {
     double abstract apply(double x, double y);
 }
 ```
-此外, 枚举类型还有一个自动产生的 valueOf(String) 方法, 它将常量的名字转变成常量本身; 如果在枚举类型中覆盖了 toString, 要考虑编写一个 fromString 方法, 将定制的字符串方法变回相应的枚举
+此外, 枚举类型还有一个自动产生的 valueOf(String) 方法, 它将常量的名字转变成常量本身; 如果在枚举类型中覆盖了 toString, 要考虑编写一个 fromString 方法, 将定制的字符串方法变回相应的枚举  
+一般来说, 当需要一组固定常量的时候, 考虑使用枚举; 与 int 常量相比, 枚举类型的优势是不言而喻的, 枚举也易读的多, 也更加安全以及强大
+
+#### 第 31 条: 用实例域代替序数
+许多枚举天生就与一个单独的 int 值相关联, 所有的枚举都有一个 ordinal 方法, 它返回每个枚举常量在类型中的数字位置, 可以尝试着从序数中得到关联的 int 值
+```
+// Abuse of ordinal to derive an associated value - DON'T DO THIS
+public enum Ensemble {
+    SOLO, DUET, TRIO, QUARTET, QUINTET, SEXTET, SEPTET, OCTET, NONET, DECTET;
+
+    public int numberOfMusicians() {
+        return ordianl() + 1;
+    }
+}
+```
+虽然这个枚举不错, 但是维护起来就像一场噩梦, 如果常量进行重新排序, numberOfMusicians 方法就会遭到破坏; 幸运的是有一种简单的方法可以解决这个问题: 永远不要根据枚举的序数导出与它关联的值, 而是要将它保存在一个实例中
+```
+public enum Ensemble {
+    SOLO(1), DUET(2), TRIO(3), QUARTET(4), QUINTET(5), SEXTET(6), SEPTET(7), OCTET(8), NONET(9), DECTET(10);
+
+    public final int numberOfMusicians;
+
+    Ensemble(int size) {
+        this.numberOfMusicians = size;
+    }
+
+    public int numberOfMusicians() {
+        return numberOfMusicians;
+    }
+}
+```
+Enum 的 ordinal 方法注释中写道: 大多数程序员将不会使用到这个方法, 它是设计为像 EnumSet 和 EnumMap 这种基于枚举的通用数据结构的; 所以除非编写的是这种数据结构的代码, 否则最好完全避免使用 ordinal 方法
 
 #### 
