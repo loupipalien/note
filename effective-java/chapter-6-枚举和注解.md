@@ -37,10 +37,10 @@ public enum Operation {
 这段代码可行但是不优雅; 如果没有 throw 语句就不能编译, 虽然从技术的角度看来是可行的, 但是 throw 语句是不可能执行到的; 而且这段代码很脆弱, 如果添加了新的枚举常量, 却忘记给 switch 添加相应的条件枚举仍然能编译, 运行时就会失败; 有一种方法可以将不同的行为与每个枚举常量关联起来: 在枚举类型中声明一个抽象的 apply 方法, 并在特定于常量的类主体 (constant-specific class body) 中用具体的方法覆盖, 这种方法被称作特定于常量的方法实现 (constant-specific method implmentation)
 ```
 public enum Operation {
-    PLUS {double abstract apply(double x, double y) {return x + y;}},
-    MINUS {double abstract apply(double x, double y) {return x - y;}},
-    TIMES {double abstract apply(double x, double y) {return x * y;}},
-    DIVIVE {double abstract apply(double x, double y) {return x / y;}};
+    PLUS {double apply(double x, double y) {return x + y;}},
+    MINUS {double apply(double x, double y) {return x - y;}},
+    TIMES {double apply(double x, double y) {return x * y;}},
+    DIVIVE {double apply(double x, double y) {return x / y;}};
 
     double abstract apply(double x, double y);
 }
@@ -164,3 +164,98 @@ System.out.println(herbsByType);
 总而言之, 最好不要用序数来索引数组, 而要使用 EnumMap
 
 #### 第 34 条: 用接口模拟可伸缩的枚举
+第 30 条中的 Operation 类型表示一个简单的计算器中的函数, 有时候要尽可能地让 API 用户提供它们自己的操作, 这样可以有效的扩展 API 所提供的操作集; 有一种很好的方法可以利用枚举来实现可伸缩的效果, 由于枚举类型可以实现接口, 基本想法就是利用这一事实
+```
+// Emulated extensible enum using an interface
+public interface Operation {
+    double apply(double x, double y);
+}
+
+public enum BasicOperation implments Operation {
+  PLUS("+") {double apply(double x, double y) {return x + y;}},
+  MINUS("-") {double apply(double x, double y) {return x - y;}},
+  TIMES("*") {double apply(double x, double y) {return x * y;}},
+  DIVIVE("/") {double apply(double x, double y) {return x / y;}};
+
+  private final String symbol;
+  BasicOperation(String symbol) {
+      this.symbol = symbol;
+  }
+
+  @override
+  public String toString() {
+      return symbol;
+  }
+}
+```
+虽然枚举类型不可扩展, 但是接口是可扩展的; 还可以定义另一个枚举其他实现 Operation 接口
+```
+public enum ExtendedOperation implments Operation {
+  EXP("+") {double apply(double x, double y) {Math.pow(x, y);}},
+  REMINDER("-") {double apply(double x, double y) {return x % y;}};
+
+  private final String symbol;
+  ExtendedOperation(String symbol) {
+      this.symbol = symbol;
+  }
+
+  @override
+  public String toString() {
+      return symbol;
+  }
+}
+```
+只要 API 写成接口类型, 在可以使用基础操作的任何地方都可以使用新的操作
+```
+public static <T extends Enum<T> & Operation> void test(Class<T> opSet, double x, double y) {
+   for(Operation op : opSet.getEnumContants()) {
+      System.out.println(op.apply(x, y));
+   }
+}
+public static void test(Collection<? extends Operation>, double x, double y) {
+   for(Operation op : opSet) {
+      System.out.println(op.apply(x, y));
+   }
+}
+```
+总而言之, 虽然无法编写可扩展的枚举类型, 却可以通过编写接口以及实现该接口的基础枚举类型, 对其进行模拟
+
+#### 第 35 条: 注解优先于命名模式
+TODO
+
+#### 第 36 条: 坚持使用 Override 注解
+这个注解只能用在方法声明中, 它表示被注解的方法声明覆盖了超类型中的一个声明; 坚持使用这个注解, 可以防止许多错误
+```
+// Can you spot the bug
+public class Bigram {
+    private final char first;
+    private final char second;
+
+    public Bigram(char first, char second) {
+        this.first = first;
+        this.second = second;
+    }
+
+    public boolean equals(Bigram b) {
+      return b.first = first && b.second = second;
+    }
+
+    public int hashCode() {
+        return 31 * first + second;
+    }
+
+    public static void main(String[] args) {
+        Set<Bigram> S = new HashSet<Bigram>();
+        for (int i = 0; i < 10; i++) {
+            for (char ch = 'a'; ch <= 'z'; ch++) {
+                s.add(new Bigram(ch, ch));
+            }
+        }
+        System.out.println(s.size());
+    }
+}
+```
+运行这个程序, 会发现集合中并不是 26 个元素而是 260 个; 这是因为程序员原本想覆盖 equals 方法 (见第 8 条), 而且还覆盖了 hashCode 方法, 但遗憾的是 equals 方法并没有被覆盖而是被重载： 如果对超类的方法覆盖标注上了 Override 的注解, 在编译时就可以发现报错; 所以应该在想要覆盖超类声明的每个方法声明中使用 Override 注解
+
+#### 第 37 条: 表标记接口定义类型
+TODO 
