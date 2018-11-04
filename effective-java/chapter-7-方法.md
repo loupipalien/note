@@ -66,4 +66,76 @@ public Date end() {
 - 避免过长的参数列表
 目标是不多于四个参数, 如果编写的许多方法都超过了这个限制, 那么 API 就会变得不好使用, 需要经常的查看文档; 相同类型的长参数序列格外有害, 会难以记住参数的顺序而导致出错
 
-有三种方法可以缩短过长的参数列表; 第一种是把方法分解成多个方法, 每个方法只需要这些参数的一些子集, 如果这样做不小心导致了方法过多, 可以通过提升方法的正交性来减少方法的数目; 第二个方法时创建辅助类, 用来保存参数的分组, 这些辅助类一般为静态成员类 (见第 22 条), 如果一个频繁出现的参数序列可以被看作是代表了某个独特的实体, 则建议使用这种方法; 第三种方法是从对象构建到方法调用都采用 Builder 模式 (见第 2 条), 如果方法带有多个参数, 尤其是当它们中有些是可选的使用, 最好定义一个对象来表示所有参数, 并允许客户端在这个对象上进行多次 "setter" 调用, 每次调用都设置一个参数, 或者设置一个较小的相关的集合
+有三种方法可以缩短过长的参数列表; 第一种是把方法分解成多个方法, 每个方法只需要这些参数的一些子集, 如果这样做不小心导致了方法过多, 可以通过提升方法的正交性来减少方法的数目; 第二个方法时创建辅助类, 用来保存参数的分组, 这些辅助类一般为静态成员类 (见第 22 条), 如果一个频繁出现的参数序列可以被看作是代表了某个独特的实体, 则建议使用这种方法; 第三种方法是从对象构建到方法调用都采用 Builder 模式 (见第 2 条), 如果方法带有多个参数, 尤其是当它们中有些是可选的使用, 最好定义一个对象来表示所有参数, 并允许客户端在这个对象上进行多次 "setter" 调用, 每次调用都设置一个参数, 或者设置一个较小的相关的集合  
+对于参数类型, 要优先使用接口而不是类 (见第 52 条), 只要有适当的接口可用来定义参数, 就优先使用这个接口而不是使用实现该接口的类; 如果使用的是类而不是接口, 则限制了客户端只能传入特定的实现, 如果碰巧输入的数据是以其他形式存在的, 就会导致不必要的, 可能非常昂贵的拷贝操作; 对于 boolean 参数, 要优先使用两个元素的枚举类型, 它是代码更易于阅读, 尤其是在使用支持自动完成功能的 IDE 的时候, 也使以后更易于添加更多的选项; 例如可能会有一个  Thermometer 类型, 带有一个静态工厂方法, 而这个静态工厂方法的签名需要传入这个枚举的值:
+```
+public enum ThermometerScale {FAHRENNEIT, CELSIUS}
+```
+Thermometer.newInstance(ThermometerScale.CELSIUS) 不仅比 Thermometer.newInstance(true) 更易读, 而且还可以在未来的发行版本中将 KELVIN 添加到 ThermometerScale 中
+
+#### 第 41 条: 慎用重载
+```
+// Broken - What does this program print ?
+public class CollectionClassifier {
+
+    public static String classify(Set<?> set) {
+      return "Set";
+    }
+
+    public static String classify(List<?> list) {
+      return "List";
+    }
+    public static String classify(Collection<?> collection) {
+      return "Unknow Collection";
+    }
+
+    public static void main(String[] args) {
+      Collection<?>[] collections = {
+              new HashSet<String>(),
+              new ArrayList<String>(),
+              new HashMap<String,String>().values()};
+
+      for (Collection<?> collection : collections) {
+          System.out.println(classify(collection));
+      }
+    }
+}
+```
+以上代码试图根据一个集合是 Set, List, 还是其他集合类型来对其分类; 可能期望以上代码打印出 " Set, Lis, Unknow Collection", 但实际上是打印了三次 "Unknow collection"; 由于 classify 方法被重载了, 而要调用哪个重载 (overloading) 方法是在编译时做出决定的, 对于 for 循环中的全部迭代参数编译都是相同的 Collection<?> 类型, 即使每次迭代的运行时类型是不同的, 但这并不影响对重载方法的选择; 即对于重载方法的选择是静态的, 对于被覆盖的方法选择是动态的, 因为覆盖机制是规范, 而重载机制是例外, 所以覆盖机制满足了人们对方法调用行为的期望, 而重载机制很容易使这些期望落空; 如果 API 的普通用户根本不知道 "对于一组给定的参数, 其中的哪一个重载方法会被调用", 那么使用这样的 API 就很可能导致错误, 因此应该避免胡乱的使用重载机制  
+对于使用重载机制的保守策略是: 永远不要导出两个具有相同参数数目的重载方法, 如果方法使用可变参数, 保守策略是根本不要重载; 可以参考 ObjectOutputStream 类对于 write 方法参数是不同类型的变形, 可以始终给方法起不同的名字, 而不使用重载机制; 对于构造器可能不能使用这样的方法, 一个类的多个构造器总是重载的, 在许多情况下, 可以选择导出静态工厂, 而不是构造器(见第 1 条)  
+在 Java 1.5 发行版本之前, 所有的基本类型都根本不同于所有的引用类型, 但是当自动装箱拆箱出现后, 就不再如此, 它会导致真正的麻烦, 例如以下程序
+```
+publi class SetList {
+     public static void main(String[] args) {
+     Set<Integer> set = new TreeSet<>();
+     List<Integer> list = new ArrayList<>();
+
+      for (int i = -3; i < 3; i++) {
+          set.add(i);
+          list.add(i);
+      }
+      for (int i = 0; i < 3; i++) {
+          set.remove(i);
+          list.remove(i);
+      }
+
+      System.out.println(set + " " + list);
+    }
+}
+```
+可能预期输出是 "[-3, -2, -1] [-3, -2, -1]", 但实际上输出的是 "[-3, -2, -1] [-2, 0, 2]"; 这是因为 Set 调用的方法是 remove(Object o), List 调用的方法是 remove(int i); JDK8 中 List 的 remove 方法调用正确, 重载方法在编译时静态确认, 装箱方法在运行时才会被调用  
+简而言之, "能够重载的方法" 并不意味着 "应该重载方法"; 一般情况下, 对于多个具有相同参数数目的方法来说, 应该尽量避免重载方法; 在某些情况下不能保证如此, 那么应该避免同一组参数只需经过类型转换就可以被传递给不同的重载方; 在某些情况下不能保证如此, 则应该保证当传递同样的参数时, 所有重载方法的行为必须一致; 如果不能做到以上, 对于被重载的方法或者构造器的使用就容易被混淆
+
+#### 第 42 条: 慎用可变参数
+Java 1.5 发行版本中增加了可变参数, 一般称作 variable arity method; 可变参数方法接受 0 或多个指定类型的参数, 可变参数的机制是通过先创建一个数组, 数组的大小为在调用位置所传递的参数个数, 然后将参数值传递到数组中, 然后经数组传递给方法
+```
+// Sample use of varargs
+static int sum(int... args) {
+    int sum = 0;
+    for (int arg : args) {
+        sum += arg;
+    }
+    return sum;
+}
+```
+有时候需要编写 1 个或者多个某种类型的参数方法, 而不是 0 个或多个
