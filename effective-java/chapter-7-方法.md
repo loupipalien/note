@@ -139,3 +139,47 @@ static int sum(int... args) {
 }
 ```
 有时候需要编写 1 个或者多个某种类型的参数方法, 而不是 0 个或多个
+```
+// The WRONG way to use varargs to pass one or more arguments
+static int min(int... args) {
+    if (args.length == 0) {
+        throw new IllegalArgumentException("Too few arguments.");
+    }
+    int min = args[0];
+    for (int i = 0; i < args.length; i++) {
+        if (args[i] < min) {
+            min = args[i];
+        }
+    }
+    return min;
+}
+```
+这样的代码虽可行, 但当客户端没有传递参数时, 就会在运行时而不是编译时失败; 另一个问题是这段代码包含参数校验, 并不美观; 以下是另一种声明, 解决了这种不足
+```
+static int min(int first firstArg, int... remainingArgs) {
+    int min = firstArg;
+    for (int arg : remainingArgs) {
+        if (arg < min) {
+            min = arg;
+        }
+    }
+    return min;
+}
+```
+正如以上所见, 当需要一个让方法带有不定数量的参数时, 可变参数就变得非常有效; 可变参数是为 printf 而设计的, 在 Java 1.5 发行版本中发布, 为了核心的反射机制 (见第 53 条), 在该发行版本中被改造成利用可变参数, printf 和反射机制都从可变参数中极大受益  
+在 Java 1.5 版本发行之前, 打印数组的常用做法是: System.out.println(Arrays.asList(array)); 但这种做法只有在对象引用类型的数组上才有用, 如果不小心在基本类型的数组上尝试这样做, 程序将无法编译; 但在 Java 1.5 中 Arrays.asList 改造成可变参数的办法, 现在基本类型数组也可以通过编译, 并且没有错误和警告; 但 Arrays.asList 方法现在 "增强" 为使用可变参数, 如果传入基本类型的数组, 会将基本类型数组的引用作为列表的元素, 打印时产生迷惑的结果; 但在 Java 1.5 发行版本中也设计了 Arrays.toString() 的方法, 专门为了将任何类型的数组转变成字符串设计的  
+在重视性能的情况下, 使用可变参数机制要特别小心, 可变参数方法的每次调用都会导致一次数组分配和初始化; 如果无法承受这一成本, 但又需要可变参数的灵活性, 则有一种方法可以如愿以偿; 假设对某个方法的 95% 的调用会有 3 个或者更少的参数, 就应该声明该方法的 5 个重载, 每个重载方法带有 0 到 3 个普通参数, 当参数的数目超过 3 个时, 就使用一个可变参数的方法
+```
+public void foo() {...}
+public void foo(int a1) {...}
+public void foo(int a1, int a2) {...}
+public void foo(int a1, int a2, int a3) {...}
+public void foo(int a1, int a2, int a3, int... rest) {...}
+```
+EnumSet 类对它的静态工厂使用这种方法, 最大幅度的减少创建枚举集合的成本
+
+#### 第 43 条: 放回零长度的数据或集合, 而不是 null
+简而言之, 返回类型为数组或者集合的方法没理由返回 null, 而不是返回一个零长度的数组或者集合
+
+#### 第 44 条: 为所有导出的 API 元素编写文档注释
+TODO
