@@ -174,3 +174,81 @@ set.addObserver(new SetObserver<Integer> {
     }
 });
 ```
+以上会在打印 0-23 的数字之后, 抛出 ConcurrentModificationException; 问题在于当 notifyElementAdded 调用观察者的 added 方法时, 正处于遍历 observers 列表中, added 方法中调用可观察集合的 removeObserver 方法, 从而调用 observers.remove, 这时非法的; notifyElementAdded 方法迭代是在一个同步块中, 可以防止并发修改, 但是无法防止迭代线程本身回调到可观察的集合中, 也无法防止修改它的 observers 列表
+```
+set.addObserver(new SetObserver<Integer> {
+    public void added(ObservableSet<Integer> s, Integer e) {
+        System.out.println(e);
+        if (e == 23) {
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            final SetObserver<Integer> observer = this;
+            try {
+                executor.submit(new Runnable() {
+                      public void run() {
+                          s.removeObserver(this);
+                      }
+                }).get();
+            } catch (ExcutionException e) {
+                throw new AssertionError(e.getCause());
+            } catch (InterruptedException e) {
+                hrow new AssertionError(e.getCause());
+            } finally {
+                executor.shutdown();
+            }
+        }
+    }
+});
+```
+使用后台线程调用造成了死锁, 它企图获得 observers 的锁, 但是以及被主线程锁住而无法获得, 这样造成了死锁  
+幸运的是, 解决这个问题可将外来方法移出同步代码块并不是十分困难, 对于 notifyElementAdded 方法将 observers 拍张快照, 然后没有锁也可以安全的操作了
+```
+// Alien method moved outside of synchronized block - open calls
+private void notifyElementAdded(E element) {
+    List<SetObserver<E>> snapshot = null;
+    synchronized(observers) {
+        snapshot = new ArrayList<>(snapshot);
+    }
+
+    for(SerObserver<E> observer : snapshot) {
+        observer.added(this, element);
+    }
+}
+```
+事实上要将外来方法的调用移出同步的代码块, 使用并发集合中的 CopyOnWriteArrayList 更好, 这是 ArrayList 的一种变体, 通过重新拷贝整个底层数组, 在这里实现所有的写操作
+```
+// Thread-safe observable set with CopyOnWriteArrayList
+private final List<SetObserver<E>> observers = new CopyOnWriteArrayList<SerObserver<E>>();
+
+public void addObserver(SetObserver<E> observer) {
+      observers.add(observer);
+}
+
+public void removeObserver(SetObserver<E> observer) {
+    observers.remove(observer);
+}
+
+private void notifyElementAdded(E element) {
+    for(SerObserver<E> observer : observers) {
+        observer.added(this, element);
+    }
+}
+```
+如果一个可变的类要并发使用, 应该使这个类变成是线程安全的 (见第 70 条), 通过内部同步还可以获得明显比从外部锁定整个对象更高的并发性, 否则就不要在内部同步而是让客户必要的时候在外部同步  
+简而言之, 为了避免死锁和数据破坏, 千万不要从同步区域内部调用外来方法, 更一般的讲是要尽量限制同步区域内部的工作量
+
+#### 第 68 条: executor 和 task 优先于线程
+Java 1.5 发行版本中增加了 java.util.concurrent 包, 这个包中包含了一个 Executor Framework, 这是一个很灵活的基于接口的任务执行工具; 在编程中尽量不要编写自己的工作队列, 而且还应该尽量不直接使用线程; 使用 Executor Framework 执行线程是更合理的
+
+#### 第 69 条: 并发工具优先于 wait 和 notify
+TODO
+
+#### 第 70 条: 线程安全性的文档化
+TODO
+
+#### 第 71 条: 慎用延迟初始化
+TODO
+
+#### 第 72 条: 不要依赖于线程调度器
+TODO
+
+#### 第 73 条: 避免使用线程组
