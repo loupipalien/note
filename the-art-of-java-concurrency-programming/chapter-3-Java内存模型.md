@@ -141,13 +141,86 @@ class ReorderExample {
     int a = 0;
     boolean flag = false;
 
-    public synchronized void writer() {
-        a = 1; // 1
-        flag = true; // 2
+    public synchronized void writer() {  // 获得锁
+        a = 1;
+        flag = true;
+        ...
+    }  // 释放锁
+
+    public synchronized void reader() {  // 获得锁
+        if (flag) {
+            int i = a;
+            ...
+        }
+    }   // 释放锁
+}
+```
+顺序一致性模型中, 所有操作完成按照程序的顺序串行执行, 而在 JMM 中临界区的代码可以重新排序, JMM 会在进入临界区和退出临界区的两个关键时间点做一些特别的处理, 使得线程在这两个时间点具有与顺序一致性模型相同的内存视图; JMM 的在事项上的基本方针是: 在不改变 (正确同步的) 程序的执行结果前提下, 尽可能地为编译器和处理器的优化打开方便之门
+
+##### 未同步程序的执行特性
+对于未同步或未正确同步的多线程程序, JMM 只提供最小安全性: 线程执行时读取到的值, 要么是之前某个线程写入的值, 要么是默认的值 (0, Null, False), JMM 保证线程读操作读取到的值不会无中生有 (Out of Thin Air) 的冒出来的; 为了实现最小安全性, JVM 在堆上分配对象时, 首先会对内存空间进行清零, 然后才会在上面分配对象; 因此在已清零的内存空间中分配对象时, 域的默认初始化已经完成了  
+JVM 不保证未同步的程序的执行结果与该程序在顺序一致性模型中的执行结果一致, 因为想要保证一致, 就要禁止大量编译器和处理器的优化, 这非常影响程序执行的性能; 未同步的程序在两个模型中的执行特性有如下差异
+- 顺序一致性模型保证单线程内的操作会按程序的顺序执行, 而 JMM 不保证单线程内操作会按程序的顺序执行
+- 顺序一致性模型保证所有线程只能看到一致性的操作执行顺序, 而 JMM 不保证所有线程看到一致的操作执行顺序
+- JMM 不保证对 64 位的 long 型和 double 型变量写操作具有原子性, 而顺序一致性模型保证对所有的内存读/写操作都具有原子性
+
+#### volatile 的内存语义
+理解 volatile 特性一个好方法是把 volatile 变量的单个读/写, 看成是使用同一个锁对这些单个读/写操作做了同步
+```
+class VolatileFeaturesExample {
+    volatile long vl = 0L;
+
+    public void set(long l) {
+        vl = l;
+    }
+
+    public void getAndIncrement() {
+        vl++;
+    }
+
+    public long get() {
+        return vl;
+    }
+}
+```
+以上程序等价于
+```
+class VolatileFeaturesExample {
+    long vl = 0L;
+
+    public synchronized void set(long l) {
+        vl = l;
+    }
+
+    public void getAndIncrement() {
+        long tmp = get();
+        tmp += 1L;
+        set(tmp);
+    }
+
+    public synchronized long get() {
+        return vl;
+    }
+}
+```
+简而言之, volatile 变量自身具有以下特性
+- 可见性: 对一个 volatile 变量的读, 总是能看到 (任意线程) 对这个 volatile 变量最后的写入
+- 原子性: 对任意单个 volatile 变量的读/写具有原子性, 但类似于 volatile++ 这种复合操作不具有原子性
+
+##### volatile 写 - 读建立的 happens-before 关系
+从 JSR-133 开始 (即从 JDK5 开始), volatile 变量的写读可以实现线程之间的通信; 从内存语义的角度来说, volatile 的读写与锁的获取和释放有相同的内存语义
+```
+class VolatileExample {
+    int a = 0;
+    volatile boolean flag = false;
+
+    public void writer() {
+        a = 1;  // 1
+        flag = true;  // 2
         ...
     }
 
-    public synchronized void reader() {
+    public void reader() {
         if (flag) {  // 3
             int i = a;  // 4
             ...
@@ -155,3 +228,16 @@ class ReorderExample {
     }
 }
 ```
+假设线程 A 执行 writer() 之后, 线程 B 执行 reader() 方法; 根据 happens-before 规则, 可以建立以下关系
+- 根据程序次序规则: 1 happens-before 2, 3 happens-before 4
+- 根据 volatile 规则: 2 happens-before 3;
+- 根据 happens-before 的传递性规则, 1 happens-before 4
+
+##### volatile 写 - 读的内存语义
+- volatile 写的内存语义: 当写一个 volatile 变量时, JMM 会把该线程对应的本地内存中的共享变量值刷新到主内存中
+即当线程 A 在写 flag 变量后, 本地内存 A 中被线程 A 更新过的两个共享变量值被刷新到主内存中
+- volatile 读的内存语义: 当读一个 volatile 变量时, JMM 会把该线程对应的本地内存置为无效, 线程接下来将从主内存中读取共享变量
+
+如果把 volatile 的写读两个步骤综合起来看, 在读线程 B 读一个 volatile 变量后, 在写线程 A 写一个 volatile 变量之前, 所有可见的共享变量的值都将立即变得对读线程 B 可见
+
+##### volatile 内存语义的实现
