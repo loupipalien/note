@@ -241,3 +241,63 @@ class VolatileExample {
 如果把 volatile 的写读两个步骤综合起来看, 在读线程 B 读一个 volatile 变量后, 在写线程 A 写一个 volatile 变量之前, 所有可见的共享变量的值都将立即变得对读线程 B 可见
 
 ##### volatile 内存语义的实现
+为了实现 volatile 内存语义, JMM 分别会限制编译器和处理器的重排序, 下表是 JMM 对编译器执行的 volatile 重排序规则表
+
+| 第一操作\第二操作 | 普通读/写 | volatile 读 | volatile 写 |
+| :------------- | :------------- | :------------- | :------------- |
+| 普通读/写 | - | - | NO |
+| volatile 读 | NO | NO | NO |
+| volatile 写 | - | NO | NO |
+
+- 当第二个操作是 volatile 写时, 无论第一个操作是什么都不能重排序; 这个规则确保 volatile 写之前的操作不会被编译器重排序到 volatile 写之后
+- 当第一个操作是 volatile 读时, 无论第二个操作是什么都不能重排序; 这个规则确保 volatile 读之后的操作不会被编译器重排序到 volatile 读之前
+- 当第一个操作是 volatile 写, 第二个操作是 volatile 读时, 不能重排序
+
+为了实现 volatile 的内存语义, 编译器在生成字节码时, 会在指令序列中插入内存屏障来禁止特定类型的处理器重排序; 对于编译器来说最小化插入内存屏障总是不可能的, 所以 JMM 采用保守策略保证在任意处理器平台都能得到正确的 volatile 内存语义
+- 在每个 volatile 写操作的前面插入一个 StoreStore 屏障
+- 在每个 volatile 写操作的后面插入一个 StoreLoad 屏障
+- 在每个 volatile 读操作的后面插入一个 LoadLoad 屏障
+- 在每个 volatile 读操作的后面插入一个 LoadStore 屏障
+
+```
+普通读/写 -> StoreStore 屏障 -> volatile 写 -> StoreLoad 屏障
+```
+StoreStore 屏障可以保证在 volatile 写之前, 其他前面的所有普通写操作刷新到主内存, 对任意处理器可见; volatile 写后面的 StoreLoad 屏障的作用是避免 volatile 写与后面可能有的  volatile 读/写操作重排序, 但编译器常无法判断在一个 volatile 写后是否需要插入 StoreLoad 屏障 (例如一个 volatile 写之后方法立即 return); 为保证正确实现 volatile 的内存语义, JMM 采用保守策略: 在每个 volatile 写后面或每个 volatile 读前插入一个 StoreLoad 屏障, 为了执行效率 JMM 选择在 volatile 写后插入屏障
+```
+volatile 读 -> LoadLoad 屏障 -> LoadStore 屏障 -> 普通读/写
+```
+LoadLoad 屏障用来禁止处理器把前面的 volatile 读与后面普通读重排序, LoadStore 屏障用来禁止处理器把前面的 volatile 读与后面的普通写重排序
+
+##### JSR-133 为什么要增强 volatile 的内存语义
+TODO
+
+#### 锁的内存语义
+
+##### 锁的释放 - 获取建立的 happens-before 关系
+锁除了让临界区互斥执行外, 还可以让释放锁 的线程向同一个锁的线程发送消息
+```
+class MonitorExample {
+    int a = 0;
+
+    public synchronized void writer() {  // 1
+        a++;                             // 2
+    }                                    // 3
+
+    public synchronized void reader() {  // 4
+        int i = a;                       // 5
+    }                                    // 6
+}
+```
+假设线程 A 执行 writer() 之后, 线程 B 执行 reader() 方法; 根据 happens-before 规则, 可以建立以下关系
+- 根据程序次序规则: 1 happens-before 2, 2 happens-before 3, 4 happens-before 5, 5 happens-before 6
+- 根据监视器锁规则: 3 happens-before 4;
+- 根据 happens-before 的传递性规则, 2 happens-before 5
+
+##### 锁的释放和获取的内存语义
+当线程释放锁时, JMM 会把该线程对应的本地内存中的共享变量刷新到主内存中; 当线程获取锁时, JMM 会把该线程对应的本地内存置为无效, 从而使得被监视器保护的临界区代码必须从主内存中读取共享变量  
+对比 volatile 内存语义, 锁释放与 volatile 写有相同的内存语义, 锁获取与 volatile 读有相同的内存语义; 以下是所获取释放的实质
+- 线程 A 释放一个锁, 实质上是线程 A 向接下来将要获取这个锁的某个线程发出了 (线程 A 对共享变量所做修改的) 消息
+- 线程 B 获取一个锁, 实质上是线程 B 接受了之前某个线程发出的 (在释放这个锁之前对共享变量所做修改的) 消息
+- 线程 A 释放锁, 随后线程 B 获取锁, 这个过程的实质是线程 A 通过主内存向线程 B 发送消息
+
+##### 锁内存语义的实现
