@@ -436,3 +436,41 @@ public class FinalReferenceExample {
 对于引用类型, 写 final 域的重排序规则对编译器和处理器增加了如下约束: 在构造函数内对一个 final 引用的对象的成员域的写入, 与随后在构造函数外把这个被构造对象的引用赋值给一个引用变量, 这两个操作之间不能被重排序
 
 ##### 为什么 final 引用不能从构造函数内 "溢出"
+写 final 域的重排序规则可以确保: 在引用变量为任意线程可见之前, 该引用变量指向的对象的 final 域已经在构造函数中被正确初始化过了; 但其实要得到这个保证, 还需要在构造函数内部不能让这个被构造对象的引用为其他线程所见, 也就是说对象引用不能在构造函数总 "逸出"
+```
+public class FinalReferenceEscaoeExample {
+    final int i;
+    static FinalReferenceEscaoeExample obj;
+
+    puublic FinalReferenceEscaoeExample() {
+        i = 1;                  // 1 写 final 域
+        obj = this;             // 2 this 引用在此处 "逸出"
+    }
+
+    public static void writer() {   
+        new FinalReferenceEscaoeExample();
+    }
+
+    public static void reader() {      
+        if (obj != null) {             // 3
+            int tmp = obj.i;           // 4
+        }
+    }
+}
+```
+假设线程 A 先执行 writer() 方法, 随后线程 B 执行 reader() 方法, 可能出现这样的执行顺序
+```
+A: 构造函数开始执行 -> A: obj = this, 被构造对象的引用在此 "逸出" -> B: if (obj != null), 读取不为 null 的对象引用 -> B: int tmp = obj.i, 将读到 final 域初始化之前的值 -> A: i = 1, 对 final 域初始化 -> A: 构造函数结束
+```
+因此, 被构造对象的引用不能为其他线程所见, 因为此时的 final 域可能还没有初始化
+
+##### final 语义在处理器中的实现
+TODO
+
+##### JSR-133 为什么要增强 final 的语义
+在旧的 Java 内存模型中, 一个最严重的缺陷就是线程可能看到 final 域的值会改变; 为了修复这个漏洞, JSR-133 增强后保证: 只要对象正确构造了 (被构造对象的引用在构造函数中没有 "逸出"), 那么不需要使用同步 (指 lock 和 volatile 的使用) 就可以保证任意线程都能看到这个 final 域在构造函数中初始化之后的值
+
+#### happens-before
+happens-before 是 JMM 最核心的概念, 理解 happens-before 是理解 JMM 的关键
+
+##### JMM 的设计
