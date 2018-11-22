@@ -301,3 +301,138 @@ class MonitorExample {
 - 线程 A 释放锁, 随后线程 B 获取锁, 这个过程的实质是线程 A 通过主内存向线程 B 发送消息
 
 ##### 锁内存语义的实现
+以下借助 ReentrantLock 分析锁内存语义的具体实现
+```
+class ReentrantLockExample {
+    int a = 0;
+    ReentrantLock lock = new ReentrantLock()
+
+    public void writer() {  
+        lock.lock();
+        try {
+            a++;                             
+        } finally {
+            lock.unlock();
+        }
+    }                                    
+
+    public  void reader() {  
+        lock.lock();
+        try {
+            int i = a;                             
+        } finally {
+            lock.unlock();
+        }                   
+    }                                   
+}
+```
+ReentrantLock 的实现依赖于 Java 同步框架 AbastactQueuedSynchronizer (简称 AQS), AQS 使用一个整形的 volatile 变量 state 来维护同步状态  
+
+TODO
+
+##### concurrent 包的实现
+由于 Java 的 CAS 同时具有 volatile 读和 volatile 写的内存语义, 因此 Java 线程之间通信现在有了以下 4 种方式
+- A 线程写 volatile 变量, 随后 B 线程读这个 volatile 变量
+- A 线程写 volatile 变量, 随后 B 线程用 CAS 更新这个 volatile 变量
+- A 线程用 CAS 更新一个 volatile 变量, 随后 B 线程用 CAS 更新这个 volatile 变量
+- A 线程用 CAS 更新一个 volatile 变量, 随后 B 线程读这个 volatile 变量
+
+volatile 变量的读/写和 CAS 可以实现线程之间的通信, 把这些整合在一起形成了 concurrent 包的基石; concurrent 包通用化的实现模式是: 首先声明共享变量为 volatile, 然后使用 CAS 的原子条件更新来实现线程之间的异步, 同时配合 volatile 读/写和 CAS 所具有的 volatile 读写的内存语义来实现线程之间的通信
+```
+---------------------------------------------------------------------
+| --------   ----------   -----------   -----------    -----------  |   
+| | Lock |   | 同步器 |   | 阻塞队列 |   | Executor |   | 并发容器 |  |                                      
+| --------   ----------   -----------   -----------    -----------  |                                  
+---------------------------------------------------------------------                                                  ^                     ^                      ^
+          |                     |                      |
+----------------------------------------------------------------------
+|        -------      ----------------    ------------               |   
+|        | AQS |      | 非阻塞数据结构 |   | 原子变量类 |              |                                      
+|        -------      ----------------    ------------               |                                  
+----------------------------------------------------------------------  
+         ^                     ^                      ^
+         |                     |                      |
+----------------------------------------------------------------------
+|        ----------------------             -------                  |   
+|        | volatile 变量的读写 |             | CAS |                  |                                      
+|        ----------------------             -------                  |                                  
+----------------------------------------------------------------------  
+```
+
+#### final 域的内存语义
+
+###### final 域的重排序规则
+对于 final 域, 编译器和处理器遵循以下两个重排序规则
+- 在构造函数内对一个 final 域的写入, 与随后把这个被构造对象的引用赋给一个引用变量, 这两个操作之间不能被重排序
+- 初次读一个包含 final 域的对象的引用, 与随后初次读这个 final 域, 这两个操作之间不能被重排序
+
+```
+public class FianlExample {
+    int i;
+    int final j;
+    static FianlExample obj;
+
+    public FianlExample() {
+        i = 1;  // 写普通域
+        j = 2;  // 写 final 域
+    }
+
+    public static void writer() {  // 写线程 A 执行
+        obj = new FianlExample();
+    }
+
+    public static void reader() {  // 读线程 B 执行
+        FianlExample object = obj;  // 读对象引用
+        int a = object.a;           // 读普通域
+        int b = object.b;           // 读 final 域
+    }
+}
+```
+
+##### 写 final 域的重排序规则
+写 final 域的重排序规则禁止把 final 域的写重排序到构造函数外, 实际包含以下两方面
+- JMM 禁止编译器把 final 域的写重排序到构造函数外
+- 编译器会在 final 域的写之后, 构造函数 return 之前, 插入一个 StoreStore 屏障, 这个屏障禁止处理器把 final 域的写重排序到构造函数外
+
+假设线程 A 先执行 writer() 方法, 随后线程 B 执行 reader() 方法, 可能出现这样的执行顺序
+```
+A: 构造函数开始执行 -> A: 写 final 域 (j = 2) -> A: StoreStore 屏障 -> A: 构造函数执行结束 -> A: 把构造对象的引用赋值给引用变量 obj -> B: 读引用对象 obj -> B: 读对象的普通域 i -> B: 读对象的 final 域 -> A: 写普通域 (i = 1)
+```
+
+##### 读 final 的重排序规则
+读 final 域的重排序规则是: 在一个线程中, 初次读对象引用与初次读该对象包含的 final 域, JMM 禁止处理器重排序这两个操作, 因为编译器会在读 final 域操作的前面插入一个 LoadLoad 屏障  
+假设线程 A 没有发生任何重排序, 可能出现这样的执行顺序
+```
+A: 构造函数开始执行 -> B: 读对象的普通域 i -> A: 写 final 域 (j = 2) -> A: StoreStore 屏障 -> A: 构造函数执行结束 -> A: 把构造对象的引用赋值给引用变量 obj -> B: 读引用对象 obj ->  B: 读对象的 final 域 -> A: 写普通域 (i = 1)
+```
+TODO
+
+##### final 为引用类型
+```
+public class FinalReferenceExample {
+    final int[] intArray;  //  final 是引用类型
+    static FinalReferenceExample obj;
+
+    puublic FinalReferenceExample() {
+        intArray = new int[1];  // 1
+        intArray[0] = 1;        // 2
+    }
+
+    public static void writerOne() {        // 写线程 A 执行
+        obj = new FinalReferenceExample();  // 3
+    }
+
+    public static void writerTne() {  // 写线程 B 执行
+        obj.intArray[0] = 2;          // 4
+    }
+
+    public static void reader() {      // 读线程 C 执行
+        if (obj != null) {             // 5
+            int tmp = obj.intArray[0]; // 6
+        }
+    }
+}
+```
+对于引用类型, 写 final 域的重排序规则对编译器和处理器增加了如下约束: 在构造函数内对一个 final 引用的对象的成员域的写入, 与随后在构造函数外把这个被构造对象的引用赋值给一个引用变量, 这两个操作之间不能被重排序
+
+##### 为什么 final 引用不能从构造函数内 "溢出"
