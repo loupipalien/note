@@ -477,3 +477,96 @@ happens-before 是 JMM 最核心的概念
 在设计 JMM 时需要考虑的两个关键因素
 - 程序员对内存模型的使用: 程序员希望内存模型易于理解, 易于编程, 程序员希望基于一个强内存模型来编写代码
 - 编译器和处理器对内存模型的实现: 编译器和处理器希望内存模型对它们的束缚越少越好, 这样就可以做尽可能多的优化来提高性能, 编译器和处理器希望实现一个弱内存模型
+
+由于以上两个因素互相矛盾, JMM 要保证为程序员提供足够强的内存可见性保证和对编译器和处理器的限制要尽可能的放松
+```
+double pi = 3.14;            // A
+double r = 1.0;              // B
+double area = pi * r * r;    // C
+```
+以上代码存在 3 个 happens-before 关系
+- A happens-before B
+- B happens-before C
+- A happens-before C
+
+以上三个关系中, 1 是非必须的, 2 和 3 是必需的, 因此 JMM 把 happens-before 要求禁止的重排序分为了以下两类
+- 会改变程序执行结果的重排序
+- 不会改变程序执行结果的重排序
+
+JMM 对这两种不同性质的重排序, 采取了不同的策略
+- 对于会改变程序执行结果的重排序, JMM 要求编译器和处理器必须禁止这种重排序
+- 对于不会改变程序执行结果的重排序, JMM 要求编译器和处理器不做要求
+
+JMM 向程序员提供的 happens-before 规则能满足程序员的要求, 也提供了足够强的内存可见性保证; JMM 对编译器和处理器的要求是: 只要不改变程序的执行结果 (单线程程序和正确同步的多线程程序), 编译器和处理器怎么优化都行
+
+##### happens-before 的定义
+ JSR-133 使用 happens-before 的概念来指定两个操作之间的执行顺序, 由于两个操作可以在一个线程之内, 也可以是在不同的线程之间, 因此 JMM 可以通过 happens-before 关系向程序员提供跨线程的内存可见性保证; JSR-133 对 happens-before 关系的定义如下
+ -  如果一个操作 happens-before 另一个操作, 那么第一个操作的执行结果将对第二个操作可见, 而且第一个操作的执行顺序排在第二个操作之前 (JMM 对程序员的承诺)
+ - 两个操作之间存在 happens-before 关系, 并不意味着 Java 平台的具体实现必须要按照 happens-before 关系指定的顺序来执行, 如果重排序之后的操作与按 happens-before 关系来执行的结果是一致的, 那么这种重排序并不非法 (JMM 对编译器和处理器重排序的约束原则)
+
+happens-before 关系本质上和 as-if-serial 语义是一回事; as-if-serial 语义保证单线程内程序的执行的执行结果不变, happens-before 关系保证正确同步的多线程程序的执行结果不被改变; as-if-serial 语义给编程单线程的程序员提供一个幻境: 单线程程序的是按照程序的顺序来执行的, happens-before 关系给编写正确同步的多线程程序的程序员提供一个幻境: 正确同步的多线程程序是按 happens-before 指定的顺序来执行的; as-if-serial 和 happens-before 都是为了在不改变程序执行的结果的前提下尽可能地提高执行的并行度
+
+##### happens-before 规则
+JSR-133 定义了如下 happens-before 规则
+- 程序顺序规则: 一个线程中的每个操作, happens-before 于该线程的任意后续操作
+- 监视器索规则: 对一个锁的解锁, happens-before 于随后对这个锁的加锁
+- volatile 变量规则: 对一个 volatile 域的写, happens-before 与任意后续对这个 volatile 的读
+- 传递性: 如果 A happens-before B, 且 B happens-before C, 那么 A  happens-before C
+- start() 规则: 如果线程 A 执行操作 ThreadB.start(), 那么 A 线程的 ThreadB.start() 操作 happens-before 于线程 B 中的任意操作
+- join() 规则: 如果线程 A 执行操作 ThreadB.join() 并成功返回, 那么线程 B 中的任意操作 happens-before 与线程 A 从 ThreadB.join() 操作成功返回
+
+#### 双重检查锁定与延迟初始化
+
+##### 双重检查锁的由来
+在 Java 程序中, 有时需要推迟一些高开销的对象初始化操作, 并且只有在使用这些对象时才进行初始化
+```
+public class UnsafeLazyInitialization {
+    private static Instance instance;
+
+    public static Instance getInstance() {
+        if (instance == null) {             // 1: 线程 A 执行
+            instance = new Instance();      // 2: 线程 B 执行
+        }
+        return instance;
+    }
+}
+```
+在 UnsafeLazyInitialization 类中, 假设 A 线程执行代码 1 的同时, B 线程执行代码 2, 此时线程 A 可能会看到 instance 引用的对象还没有初始化; 对于 UnsafeLazyInitialization 类可以对 getInstance() 方法来同步处理来实现线程安全的延迟初始化
+```
+public class SafeLazyInitialization {
+    private static Instance instance;
+
+    public synchronized static Instance getInstance() {
+        if (instance == null) {            
+            instance = new Instance();     
+        }
+        return instance;
+    }
+}
+```
+对 getInstance() 方法做了同步处理, synchronized 将导致性能开销; 如果 getInstance() 方法被多个线程频繁调用则会导致执行性能下降, 如果 getInstance() 方法不会被多个线程频繁调用, 那么这个延迟初始化方案将能提供令人满意的性能; 在早期的 JVM 中 synchronized 会有巨大的性能开销, 人们使用使用双重检查锁定 (Double-Checked Locking) 来解决这个问题
+```
+public class DoubleCheckedLocking {                          // 1
+    private static Instance instance;                        // 2
+
+    public static Instance getInstance() {                   // 3
+        if (instance == null) {                              // 4: 第一次检查
+            synchronized (DoubleCheckedLocking.class) {      // 5：加锁
+                if (instance == null) {                      // 6: 第二次检查
+                    instance = new Instance();               // 7：问题的根源出在这里
+                }                                            
+            }                                                // 8:
+        }                                                    // 9:
+        return instance;                                     // 10:   
+    }                                                        // 11:
+}
+```
+如果第一次检查 instance 不为 null, 那么就不需要执行下面的加锁和初始化操作, 就可以大幅度降低 synchronized 带来的性能开销; 以上代码看起来两全其美, 但是线程执行到第 4 行, 代码读取到 instance 不为 null 时, instance 引用的对象有可能还没有完成初始化
+
+##### 问题的根源
+双重检查锁定示例代码的第 7 行 (instance = new Singleton();) 创建了一个对象, 这一行代码可以分解为如下三行
+```
+memory = allocate();    // 1: 分配对象的内存空间
+ctorInstance(memory);   // 2: 初始化对象
+
+```
