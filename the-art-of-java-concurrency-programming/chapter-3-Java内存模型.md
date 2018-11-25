@@ -568,5 +568,110 @@ public class DoubleCheckedLocking {                          // 1
 ```
 memory = allocate();    // 1: 分配对象的内存空间
 ctorInstance(memory);   // 2: 初始化对象
-
+instance = memory;      // 3: 设置 instance 指向刚分配的内存地址
 ```
+上面 3 行伪代码的 2 和 3 之间可能会被重排序, 2 和 3 重排序之后的执行时序如下
+```
+memory = allocate();    // 1: 分配对象的内存空间
+instance = memory;      // 3: 设置 instance 指向刚分配的内存地址 (此时对象还未初始化)
+ctorInstance(memory);   // 2: 初始化对象
+```
+根据 Java 语言规范, 所有线程在执行 Java 程序时必须要遵守 intra-thread semantics, intra-thread semantics 保证重排序不会改变单线程内的程序执行结果, 即 2 和 3 重排序并不违反 intra-thread semantics; 这个重排序在没有改变单线程程序执行结果的前提下, 可以提高程序的执行性能; 但在多线程当中就可能引发问题, 以下是引发问题的线程执行顺序图
+```
+A: 1: 分配对象的内存空间 -> A: 3: 设置 instance 指向内存空间 -> B: 1: 判断 instance 是否为空 -> B: 2: B 线程初次访问对象 -> A: 2: 初始化对象 -> A: 4: A 线程初次访问对象
+```
+可以看出, 单线程遵守 intra-thread semantics 能保证 A 线程的执行结果不会被改变, 但 B 线程却可能看到一个还没有被初始化的对象; 即 DoubleCheckedLocking 代码第 7 行 (instance = new Singleton();) 如果发生重排序, 另一个并发执行的线程 B 就有可能在第 4 行判断 instance 不为 null, 线程 B 接下来访问 instance 所引用的对象, 但此时这个对象可能还没有被 A 线程初始化; 有两种方法可以实现线程安全的延迟初始化
+- 不允许 2 和 3 重排序
+- 允许 2 和 3 重排序, 但不允许其他线程 "看到" 这个重排序
+
+##### 基于 volatile 的解决方案
+```
+// 需要 JDK 5 或更高版本的支持, 因为 JDK 5 使用 JSR-133, 增强了 volatile 的语义
+public class SafeDoubleCheckedLocking {                          
+    private volatile static Instance instance;                       
+
+    public static Instance getInstance() {                  
+        if (instance == null) {                              
+            synchronized (DoubleCheckedLocking.class) {      
+                if (instance == null) {                      
+                    instance = new Instance();               
+                }                                            
+            }                                               
+        }                                                   
+        return instance;                                    
+    }                                                      
+}
+```
+即把 instance 变量声明为 volatile, 来禁止 2 和 3 的重排序到达目的; 以上代码在多线程中执行的时序
+```
+A: 1: 分配对象的内存空间 -> A: 2: 初始化对象 -> A: 3: 设置 instance 指向内存空间 -> B: 1: 判断 instance 是否为空 -> B: 2: B 线程初次访问对象 -> A: 4: A 线程初次访问对象
+```
+
+##### 基于类初始化的解决方案
+JVM 在类的初始化阶段 (即在 Class 被加载后, 且在线程使用之前), 会执行类的初始化, 在执行类的初始化期间 JVM 会去获取一个锁; 这个锁可以同步多个线程对同一个类的初始化; 基于此特性实现另一种线程安全的延迟初始化方案 (被称为 Instantiation On Demand Holder idiom)
+```
+public class InstanceFactory {
+    /**
+     * 这样虽然线程安全, 但是会被立即初始化 (符合情况 3)
+     * private static Instance instance = new Instance();
+     */
+
+    private static class InstanceHolder {
+        private static Instance instance = new Instance();
+    }
+
+    public static Instance getInstance() {
+        return InstanceFactory.instance;   // 这里将导致 InstanceFactory 这个类被初始化
+    }
+}
+```
+这个方案的实质是: 允许 2 和 3 重排序, 但是不允许非构造线程 (这里指 B 线程) "看到" 这个重排序  
+初始化一个类, 包括执行这个类的静态初始化和初始化在这个类中声明的静态字段; 根据 Java 语言规范, 在首次发生下列任意一种情况时, 一个类或接口类型 T 将立即被初始化
+- T 是一个类, 而且一个 T 类型的实例被创建
+- T 是一个类, 且 T 中声明的一个静态方法被创建
+- T 中声明的一个静态字段被赋值
+- T 中声明的一个静态字段被使用, 而且这个字段不是一个常量字段
+- T 是一个顶级类, 而且一个断言语句嵌套在 T 内存被执行
+
+在 InstanceFactory 示例中, 首次执行 getInstance() 方法的线程将导致 InstanceHolder 类被执行 (符合情况 4)  
+
+对于类或接口的初始化, Java 语言制定了精巧而复杂的类初始化处理过程
+TODO  
+
+以上两种方案, 可以发现基于类初始化的方案的实现代码更加简洁, 但基于 volatile 的双重检查锁定的方案有一个额外的优势: 除了可以对静态字段实现延迟初始化, 还可以对实例字段实现延迟初始化; 如果确实需要对实例字段使用线程安全的延迟初始化, 使用基于 volatile 的延迟初始化, 如果确实需要对静态字段使用线程安全的延迟初始化, 使用基于类初始化的方法
+
+#### Java 内存模型综述
+
+##### 处理器的内存模型
+根据对不同类型的读/写操作组合的执行顺序的放松, 可以把常见的处理器内存模型划分为如下几种类型
+- 放松程序中写 - 读操作的顺序, 由此产生了 Total Store Ordering 内存模型 (简称为 TSO)
+- 在上面的基础上, 继续放松程序中写 - 写操作的顺序, 由此产生了 Partial Store Order 内存模型 (简称 PSO)
+- 在前面两条的基础上, 继续放松程序中读 - 写和读 - 读的操作顺序, 由此产生了 Relaxed Memory Order 内存模型 (简称 RMO) 和 PowerPC 内存模型
+
+这里的读/写操作的放松, 是以两个操作之间不存在数据依赖性的前提的 (处理器要遵守 as-if-serial 语义, 不会对存在数据依赖性的两个内存操作做重排序的); 以下是常见处理器的细节特征
+
+| 内存模型名称 | 对应的处理器 | Store-Load 重排序 | Store-Store 重排序 | Load-Load 和 Load-Store 重排序 | 可以更早读取到其他处理器的写 | 可以更早读取到当前处理器的写 |
+| - | - | - | - | - | - | - |
+| TSO | SPARC-TSO X64 | Y | | | | Y |
+| PSO | SPARC-PSO | Y | Y | | | Y |
+| RMO | IA64 | Y | Y | Y | | Y |
+| PowerPC | PowerPC | Y | Y | Y | Y | Y |
+
+所有处理器内存模型都允许写 - 读重排序, 因为它们都使用了写缓存区, 写缓存区可能导致写 - 读操作重排序; 所有处理器也都允许更早读到当前处理器的写, 同样也是因为写缓存; 表中各种处理器的内存模型从上到下模型变弱, 越是追求性能的处理器, 内存模型设计得就会越弱, 处理器的束缚就越少, 就可能做更多的优化; 由于常见的处理器内存模型比 JMM 要弱, Java 编译器在生成字节码时会在执行指令适当的位置插入内存屏障来限制处理器的重排序; JMM 屏蔽了不同处理器内存模型的差异, 在不同的处理器平台上给程序员呈现出一个一致的内存模型
+
+##### 各种内存模型之间的关系
+JMM 是一个语言级内存模型, 处理器内存模型是硬件级的内存模型, 顺序一致性模型是一个理论参考模型; 以下是各种内存模型强弱对比
+```
+>>> 最好 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 易编程性 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 最差 >>>
+PowerPC - IA64 - SPARC-PSO - X86 - SPARC-TSO - C++ 11 MM - JMM - CLR 2.0 MM - Sequential Consistency
+<<< 最差 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 执行性能 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 最好 <<<
+```
+
+##### JMM 的内存可见性保证
+- 单线程程序: 不会出现内存可见性问题; 编译器, runtime, 处理器会共同确保单线程程序的执行结果和在顺序一致性模型中一致
+- 正确同步的多线程程序: 正确同步的多线程程序的执行将具有顺序一致性, JMM 通过限制编译器和处理器的重排序来为提供内存可见性保证
+- 未同步 / 未正确同步的多线程程序; JMM 提供了最小安全性保障: 线程执行时读取到的值, 要么是之前某个线程写入的值, 要么是默认值
+
+##### JSR-133 对旧内存模型的修补
+- 增强 volatile 的内存语义: 旧内存模型允许 volatile 变量与普通变量重排序, JSR-133 严格限制 volatile 变量与普通变量重排序, 使 volatile 的写 - 读和锁的释放 - 获取具有同样的内存语义
+- 增强 final 的内存语义: 旧内存模型中多次读取同一个 final 变量的值可能会不同, JSR-133 为 final 增加了两个重排序规则, 保证在 final 引用不会从构造函数逸出的情况下, 具有初始化安全性
