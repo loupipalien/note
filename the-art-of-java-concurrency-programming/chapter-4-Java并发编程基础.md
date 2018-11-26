@@ -24,3 +24,145 @@ Java 线程在运行的生命周期中可能处于 6 种不同的状态, 在给�
 | WAITING | 等待状态, 表示线程进入等待状态, 进入该状态表示当前线程需要等待其他线程做出一些特定动作 (通知或中断) |
 | TIME_WAITING | 超时等待状态, 不同于 WAITING, 它是可以在指定的时间自行返回的 |
 | TERMINATED | 终止状态, 表示当前线程已经执行完毕 |
+
+##### Daemon 线程
+Daemon 线程是一种支持型线程, 主要被用作于程序后台调度以及支持性工作, 这意味着当 Java 虚拟机中不存在非 Daemon 线程的时候, Java 虚拟机将会退出, 可以使用 Thread.setDeamon(true) 将线程设置为 Daemon 线程
+
+#### 启动和终止线程
+
+##### 构造线程
+在运行线程之前首先要构造一个线程对象, 线程对象在构造的时候需要提供线程所需要的一些属性; 以下代码是 Thread 类中对线程进行初始化的部分
+```
+private void init(ThreadGroup g, Runnable target, String name,
+                      long stackSize, AccessControlContext acc,
+                      boolean inheritThreadLocals) {
+        if (name == null) {
+            throw new NullPointerException("name cannot be null");
+        }
+
+        this.name = name;
+
+        Thread parent = currentThread();
+        SecurityManager security = System.getSecurityManager();
+        if (g == null) {
+            /* Determine if it's an applet or not */
+
+            /* If there is a security manager, ask the security manager
+               what to do. */
+            if (security != null) {
+                g = security.getThreadGroup();
+            }
+
+            /* If the security doesn't have a strong opinion of the matter
+               use the parent thread group. */
+            if (g == null) {
+                g = parent.getThreadGroup();
+            }
+        }
+
+        /* checkAccess regardless of whether or not threadgroup is
+           explicitly passed in. */
+        g.checkAccess();
+
+        /*
+         * Do we have the required permissions?
+         */
+        if (security != null) {
+            if (isCCLOverridden(getClass())) {
+                security.checkPermission(SUBCLASS_IMPLEMENTATION_PERMISSION);
+            }
+        }
+        // 线程组未启动的线程加一
+        g.addUnstarted();
+        // 继承父线程的 group, daemon, priority
+        this.group = g;
+        this.daemon = parent.isDaemon();
+        this.priority = parent.getPriority();
+        if (security == null || isCCLOverridden(parent.getClass()))
+            this.contextClassLoader = parent.getContextClassLoader();
+        else
+            this.contextClassLoader = parent.contextClassLoader;
+        this.inheritedAccessControlContext =
+                acc != null ? acc : AccessController.getContext();
+        this.target = target;
+        setPriority(priority);
+        if (inheritThreadLocals && parent.inheritableThreadLocals != null)
+            this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
+        /* Stash the specified stack size in case the VM cares */
+        this.stackSize = stackSize;
+
+        /* Set thread ID */
+        tid = nextThreadID();
+    }
+```
+由此可见一个线程对象是由其父线程来进行空间分配的, 子线程继承了父线程的一些域, 并且分到一个 tid 来标识此线程; 至此一个能够运行的线程初始化完成, 在堆内存中等待着运行
+
+##### 启动线程
+线程对象初始化完成后, 调用 start() 方法就可以启动这个线程, start() 方法的含义是: 当前线程 (即父线程) 同步告知 Java 虚拟机, 只要线程规划器空闲, 应立即启动此线程; 启动一个线程前最好设置线程名称, 在使用 jstack 分析程序时可以获得一些有用的提示
+
+##### 理解中断
+线程通过自身检查是否被中断来进行响应, 线程通过方法 isInterrupted() 来进行判断是否被中断, 也可以调用静态方法 Thread.interrupted() 对当前线程的中断标识进行复位; 如果该线程已经处于终结状态, 级该线程被中断过, 在调用该线程对象的 isInterrupted() 时依然会返回 false; 其他许多抛出 InterruptedException 的方法在抛出此异常前, JVM 会先将该线程的中断标识位清除然后抛出异常, 此时调用 isInterrupted() 方法将会返回 false
+
+##### 过期的 suspend(), resume(), stop()
+这些方法过期的原因是会带来副作用: suspend() 方法在 调用后不会释放已经占有的资源 (比如锁), 而是占着资源进入睡眠状态, 这样容易引发死锁问题; stop() 方法在终结线程时不会保证线程的资源正确释放, 通常是没有给予线程完成资源释放工作的机会, 会导致程序可能工作在不确定的状态下
+
+##### 安全地终止线程
+通过中断或者一个 boolean 变量来控制线程是否终止
+
+#### 线程间通信
+Java 支持多个线程同时访问一个对象或者对象的成员变量, 由于每个线程可以拥有这个变量的拷贝 (每个线程有一份拷贝是为了加速程序的运行), 所以在程序执行过程中, 一个线程看到的变量并不一定是最新的; 可以使用 volatile 或 synchronized 关键字来保证共享变量对其他线程的可见性  
+以下代码使用了同步代码块和同步方法, 使用 javap 分析同步的实现细节
+```
+public class Synchronized {
+    public static void main(String[] args) {
+        // 同步代码块, 对 Synchronized Class 对象进行加锁
+        synchronized (Synchronized.class) {}
+        // 静态同步方法, 对 Synchronized Class 对象进行加锁
+        m();
+    }
+
+    public static synchronized void m() {}
+}
+```
+javap -v Synchronized.class 后如下 (省略部分信息)
+```
+public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=2, locals=3, args_size=1
+         0: ldc           #2                  // class com/ltchen/java/demo/lang/Synchronized
+         2: dup
+         3: astore_1
+         4: monitorenter
+         5: aload_1
+         6: monitorexit
+         7: goto          15
+        10: astore_2
+        11: aload_1
+        12: monitorexit
+        13: aload_2
+        14: athrow
+        15: invokestatic  #3                  // Method m:()V
+        18: return
+      ...
+
+  public static synchronized void m();
+    descriptor: ()V
+    flags: ACC_PUBLIC, ACC_STATIC, ACC_SYNCHRONIZED
+    Code:
+      stack=0, locals=0, args_size=0
+         0: return
+      ...
+```
+可以看到同步代码块使用 monitorenter 和 monitorexit 实现, 而同步方法则使用 ACC_SYNCHRONIZED 来完成; 无论采用哪种方式, 本质上都是对一个对象的监视器 (monitor) 进行获取; 任意一个对象都有自己的监视器, 当这个对象由同步代码块或者同步方法调用时, 执行方法的线程必须先获取到该对象的监视器才能进入同步代码块或者同步方法, 而没有获得监视器的线程将会被阻塞在入口处, 进入 BLOCKED 状态; 对象, 对象的监视器, 同步队列, 执行线程关系如下
+```
+    Mointor.Enter   |---------|    Mointor.Enter 成功    |---------|    Mointor.Exit
+--------------------| Monitor |--------------------------| Object  |------------------>
+                    |---------|                          |---------|
+  Mointor.Exit 通知后  ^    |    Mointor.Enter 失败后
+  其余线程出队列        |    V    线程入队列
+                ---------------------
+                | SynchronizedQueue |
+                ---------------------
+```
