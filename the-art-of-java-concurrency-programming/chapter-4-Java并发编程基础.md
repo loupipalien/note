@@ -219,4 +219,101 @@ WaitThread 首先获取了对象的锁, 然后调用对象的 wait() 方法, 从
 - 通知所有等待在对象上的线程
 
 ##### 管道输入 / 输出流
-管道输入/输出流和普通的文件输入/输出流或者网络输入/输出流不同之处在于, 它主要用于线程之间的数据传输, 而传输的媒介为内存
+管道输入/输出流和普通的文件输入/输出流或者网络输入/输出流不同之处在于, 它主要用于线程之间的数据传输, 而传输的媒介为内存; 管道输入/输出流主要包括四种具体实现: PipedOutputStream, PipedInputStream, PipedReader, PipedWriter, 前两种面向字节, 后两种面向字符
+```
+public class Piped {
+    public static void main(String[] args) throws Exception {
+        PipedWriter out = new PipedWriter();
+        PipedReader in = new PipedReader();
+        // 将输入输出流进行连接
+        out.connect(in);
+        Thread printThread = new Thread(new Print(in), "PrintThread");
+        printThread.start();
+        int receive = 0;
+        try {
+            while ((receive = System.in.read()) != -1) {
+                out.write(receive);
+            }
+        } finally {
+            out.close();
+        }
+    }
+
+    static class Print implements Runnable {
+        private PipedReader in;
+
+        public Print(PipedReader in) {
+            this.in = in;
+        }
+
+        @Override
+        public void run() {
+            int receive = 0;
+            try {
+                while ((receive = in.read()) != -1) {
+                    System.out.println((char) receive);
+                }
+            } catch (IOException e) {
+                // swallow exception
+            }
+        }
+    }
+}
+```
+
+##### Thread.join() 的使用
+如果线程 A 执行了 Thread.join() 语句, 其含义是: 当前线程 A 等待 thread 线程终止结束之后才从 Thread.join() 返回; 除此之外, 还提供 Thread.join(long millis) 和 Thread.join(long millis, int nanos); 以下是 Thread.join() 的源码
+```
+public final void join() throws InterruptedException {
+    join(0);
+}
+
+public final synchronized void join(long millis)
+throws InterruptedException {
+    long base = System.currentTimeMillis();
+    long now = 0;
+
+    if (millis < 0) {
+        throw new IllegalArgumentException("timeout value is negative");
+    }
+
+    if (millis == 0) {
+        while (isAlive()) {
+            wait(0);
+        }
+    } else {
+        while (isAlive()) {
+            long delay = millis - now;
+            if (delay <= 0) {
+                break;
+            }
+            wait(delay);
+            now = System.currentTimeMillis() - base;
+        }
+    }
+}
+```
+可以看到 Thread.join() 代码逻辑符合等待通知机制的等待方; 当线程终止时会调用线程自身的 notifyAll() 方法, 通知所有等待在该线程对象上的线程
+
+##### ThreadLocal 的使用
+ThreadLocal 即线程变量, 是一个以 ThreadLocal 对象为键, 任意对象为值的存储结构; 这个结构附在线程上, 即一个线程可以根据一个 ThreadLocal 对象查询到绑定在这个线程上的值  
+TODO
+
+#### 线程应用实例
+
+##### 等待超时模式
+```
+public synchronized Object get(long mills) throws InterruptedException {
+    long future = System.currentTimeMillis() + mills;
+    long remaining = mills;
+    // 当超时大于 0 且 result 返回值不满足条件时
+    while ((result == null) && remaining > 0) {
+        wait(remaining);
+        remaining = future - System.currentTimeMillis();
+    }
+    return result;
+}
+```
+等待超时模式就是在等待通知上增加了超时控制, 这使得该模式相比原来更有范式和灵活性, 因为即使方法执行时间很长也不会 "永久阻塞", 而是按照要求 "按时" 返回
+
+##### 一个简单的数据库连接池示例
