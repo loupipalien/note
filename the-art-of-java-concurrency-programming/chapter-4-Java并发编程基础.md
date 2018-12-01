@@ -317,3 +317,21 @@ public synchronized Object get(long mills) throws InterruptedException {
 等待超时模式就是在等待通知上增加了超时控制, 这使得该模式相比原来更有范式和灵活性, 因为即使方法执行时间很长也不会 "永久阻塞", 而是按照要求 "按时" 返回
 
 ##### 一个简单的数据库连接池示例
+TODO
+
+##### 线程池技术及其示例
+以下是一个简单线程池的接口定义
+```
+public interface ThreadPool <T extends Runnable> {
+    // 执行一个 Runnable
+    void execute(T t);
+    // 关闭线程池
+    void shutdown();
+    // 增加线程数
+    void addWorkers(int num);
+    // 减少线程数
+    void removeWorkers(int num);
+    // 获取正在等待执行的 Runnable
+    int getSize();
+}
+```
