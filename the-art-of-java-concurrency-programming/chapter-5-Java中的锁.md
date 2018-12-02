@@ -190,5 +190,69 @@ public class Mutex implements Lock {
 ###### 独占式同步状态获取与释放
 通过调用同步器的 acquire(int arg) 方法可以获取同步状态, 该方法对中断不敏感, 线程获取同步方法失败后进入同步队列中
 ```
-
+public final void acquire(int arg) {
+    if (!tryAcquire(arg) &&
+        acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+        selfInterrupt();
+}
 ```
+以上代码主要完成了同步状态获取, 节点构造, 加入同步队列以及在同步队列中自旋等待等工作; 首先是节点构造工作
+```
+private Node addWaiter(Node mode) {
+    Node node = new Node(Thread.currentThread(), mode);
+    // Try the fast path of enq; backup to full enq on failure
+    Node pred = tail;
+    if (pred != null) {
+        node.prev = pred;
+        if (compareAndSetTail(pred, node)) {                     
+            pred.next = node;
+            return node;
+        }
+    }
+    enq(node);                                      
+    return node;
+}
+...
+private Node enq(final Node node) {
+    for (;;) {                                                              
+        Node t = tail;
+        if (t == null) { // Must initialize
+            if (compareAndSetHead(new Node()))
+                tail = head;
+        } else {
+            node.prev = t;
+            if (compareAndSetTail(t, node)) {
+                t.next = node;
+                return t;
+            }
+        }
+    }
+}
+```
+在 enq(final Node node) 方法中, 同步器通过 "死循环" 来保证节点的正确添加; 可以看到, enq(final Node node) 方法将并发添加节点的请求通过 CAS 变得 "串行化" 了  
+节点进入同步队列之后, 就进入到了一个自旋的过程, 每个节点 (或者说每个线程) 都在自省观察, 当条件满足, 获取到同步状态, 就可以从这个自旋过程中退出, 否则依旧留在这个自旋过程中 (并且会阻塞节点的线程)
+```
+final boolean acquireQueued(final Node node, int arg) {
+    boolean failed = true;
+    try {
+        boolean interrupted = false;
+        for (;;) {
+            final Node p = node.predecessor();                          
+            if (p == head && tryAcquire(arg)) {                        
+                setHead(node);
+                p.next = null; // help GC
+                failed = false;
+                return interrupted;
+            }
+            if (shouldParkAfterFailedAcquire(p, node) &&
+                parkAndCheckInterrupt())
+                interrupted = true;
+        }
+    } finally {
+        if (failed)
+            cancelAcquire(node);
+    }
+}
+```
+acquireQueued(final Node node, int arg) 方法中, 当前线程 "死循环" 中尝试获取同步的状态, 只有前驱节点是头节点时才能够尝试获取同步状态
+TODO
