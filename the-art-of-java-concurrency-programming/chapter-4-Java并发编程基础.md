@@ -335,3 +335,134 @@ public interface ThreadPool <T extends Runnable> {
     int getSize();
 }
 ```
+默认的线程池接口实现
+```
+class DefaultThreadPoll<Job extends Runnable> implements ThreadPool<Job> {
+    // 最大线程数
+    private static final int MAX_WORKER_NUMBER = 10;
+    // 默认线程数
+    private static final int DEFAULT_WORKER_NUMBERS = 5;
+    // 最小线程数
+    private static final int MIN_WORKER_NUMBERS = 1;
+    // 工作列表, 保存提交的工作
+    private final LinkedList<Job> jobs = new LinkedList<>();
+    // 工作者列表
+    private final List<Worker> workers = Collections.synchronizedList(new ArrayList<>());
+    // 工作者线程数量
+    private int workerNum = DEFAULT_WORKER_NUMBERS;
+    // 线程编号生成
+    private AtomicLong threadNum = new AtomicLong();
+
+    public DefaultThreadPoll() {
+        initializeWorkers(DEFAULT_WORKER_NUMBERS);
+    }
+
+    public DefaultThreadPoll(int num) {
+        this.workerNum = num > MAX_WORKER_NUMBER ? MAX_WORKER_NUMBER :
+                num < MIN_WORKER_NUMBERS ? MIN_WORKER_NUMBERS : num;
+        initializeWorkers(workerNum);
+    }
+
+    @Override
+    public void execute(Job job) {
+        if (job != null) {
+            // 添加一个工作, 然后通知
+            synchronized (jobs) {
+                jobs.addLast(job);
+                jobs.notify();
+            }
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        for (Worker worker : workers) {
+            worker.shutdown();
+        }
+    }
+
+    @Override
+    public void addWorkers(int num) {
+        synchronized (jobs) {
+            // 限制新增的 worker 数量不能超过最大值
+            if (num + this.workerNum > MAX_WORKER_NUMBER) {
+                num = MAX_WORKER_NUMBER - this.workerNum;
+            }
+            initializeWorkers(num);
+            this.workerNum += num;
+        }
+    }
+
+    @Override
+    public void removeWorkers(int num) {
+        synchronized (jobs) {
+            if (num >= this.workerNum) {
+                throw new IllegalArgumentException("beyond worker number");
+            }
+            // 按照给定的数量停止 worker
+            int count = 0;
+            while (count < num) {
+                Worker worker =  workers.get(0);
+                if (workers.remove(worker)) {
+                    worker.shutdown();
+                    count++;
+                }
+                this.workerNum -= count;
+            }
+        }
+    }
+
+    @Override
+    public int getJobSize() {
+        return jobs.size();
+    }
+
+    // 初始化线程工作者
+    private void initializeWorkers(int num) {
+        for (int i = 0; i < num; i++) {
+            Worker worker = new Worker();
+            workers.add(worker);
+            Thread thread = new Thread(worker, "ThreadPool-Worker-" + threadNum.incrementAndGet());
+            thread.start();
+        }
+    }
+
+    // 工作者, 负责消费任务
+    class Worker implements Runnable {
+        // 是否工作
+        private volatile boolean running = true;
+
+        @Override
+        public void run() {
+            while (running) {
+                Job job = null;
+                synchronized (jobs) {
+                    // 如果工作者列表是空的, 那么就 wait
+                    while (jobs.isEmpty()) {
+                        try {
+                            jobs.wait();
+                        } catch (InterruptedException e) {
+                            // 感知到外部对 WorkerThread 的中断操作, 返回
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                    // 取出一个 job
+                    job = jobs.removeFirst();
+                }
+                if (job != null) {
+                    job.run();
+                }
+            }
+        }
+
+        public void shutdown() {
+            running = false;
+        }
+    }
+}
+```
+可以看到添加一个 job 后, 对工作队列 jobs 调用了其 notify() 方法, 而不是 notifyAll() 方法, 因为能够确定有工作者线程被唤醒, 这时使用 notify() 方法将会比 notifyAll() 方法获得更小的开销 (避免将等待队列中的线程全部移动到阻塞队列中)
+
+##### 一个基于线程池技术的简单 Web 服务器
+TODO
