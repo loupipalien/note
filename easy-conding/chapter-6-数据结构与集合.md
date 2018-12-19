@@ -328,4 +328,160 @@ TimSort 算法相对于传统归并排序减少了归并次数, 相对于插入�
 - 引入二分排序 (binarySort), 二分排序是对插入排序的优化, 在插入排序中不再是从后往前逐个元素对比, 而是引入二分查找的思想, 将一次查找新元素合适位置的时间复杂度从  $ O(n) $ 降低到 $ O(log_n) $
 
 ##### hashCode 和 equals
-hashCode 和 equals 用来标识对象, 两个方法协同工作可用来判断两个对象是否相等; 根据生成的哈希将数据离散开来, 可以使存取元素更快, 对象通过调用 Object.hashCode() 生成哈希值, 由于不可避免会存在哈希值冲突的情况, 因此当 hashCode 相同时在调用 equals() 进行比较; 但是当 hashCode 不同时可以直接判定 Objects 不同, 从而跳过 equals, 这加快了处理效率
+hashCode 和 equals 用来标识对象, 两个方法协同工作可用来判断两个对象是否相等; 根据生成的哈希将数据离散开来, 可以使存取元素更快, 对象通过调用 Object.hashCode() 生成哈希值, 由于不可避免会存在哈希值冲突的情况, 因此当 hashCode 相同时在调用 equals() 进行比较; 但是当 hashCode 不同时可以直接判定 Objects 不同, 从而跳过 equals, 这加快了处理效率; Object 类定义中对 hashCode 和 equals 要求如下
+- 如果两个对象的 equals 的结果是相等的, 则两个对象的 hasdCode 的返回结果也必须相等
+- 任何时候覆写 equals, 都必须同时覆写 hasdCode
+
+在 Map 和 Set 类集合中的 get() 方法实现, 首先判断 hasdCode 方法再判断 equals() 的结果
+```
+public V get(Object key) {
+    Node<K,V> e;
+    return (e = getNode(hash(key), key)) == null ? null : e.value;
+}
+
+final Node<K,V> getNode(int hash, Object key) {
+    Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
+    if ((tab = table) != null && (n = tab.length) > 0 &&
+        (first = tab[(n - 1) & hash]) != null) {
+        if (first.hash == hash && // always check first node                // MARK: 先比较 hash 值
+            ((k = first.key) == key || (key != null && key.equals(k))))     // MARK: 再比较地址或者 equals 方法
+            return first;
+        if ((e = first.next) != null) {
+            if (first instanceof TreeNode)
+                return ((TreeNode<K,V>)first).getTreeNode(hash, key);
+            do {
+                if (e.hash == hash &&
+                    ((k = e.key) == key || (key != null && key.equals(k))))
+                    return e;
+            } while ((e = e.next) != null);
+        }
+    }
+    return null;
+}
+```
+如果自定义对象作为 Map 的键, 那么必须同时覆写 hasdCode 和 equals 方法, 此外 Set 也是如此; 如果不覆写 hasdCode 但是覆写了 equals 方法, 当两个对象的 equals 方法返回 true 时, 在集合中仍然是两个不同的元素, 因为默认的 hasdCode 码是根据地址生成的  
+另外, equals() 方法的实现方式与类的具体处理逻辑有关, 但又各不相同, 应该尽量分析源码确定结果, 例如以下
+```
+public static void main(String[] args) {
+    LinkedList<Integer> linkedList = new LinkedList<>();
+    linkedList.add(1);
+    ArrayList<Integer> arrayList = new ArrayList<>();
+    arrayList.add(1);
+    System.out.println(arrayList.equals(linkedList));
+}
+```
+以上代码会输出  true, 这是由于 ArrayList 和 LinkedList 都是继承了 AbstractList 的 equals() 方法, 只判断了接口类型和其中元素
+```
+public boolean equals(Object o) {
+    if (o == this)
+        return true;
+    if (!(o instanceof List))
+        return false;
+
+    ListIterator<E> e1 = listIterator();
+    ListIterator<?> e2 = ((List<?>) o).listIterator();
+    while (e1.hasNext() && e2.hasNext()) {
+        E o1 = e1.next();
+        Object o2 = e2.next();
+        if (!(o1==null ? o2==null : o1.equals(o2)))
+            return false;
+    }
+    return !(e1.hasNext() || e2.hasNext());
+}
+```
+
+#### fail-fast 机制
+这时一种对集合遍历操作时的错误检测机制, 在遍历中途出现意料之外的修改时, 通过 unchecked 的异常暴力的反馈处来; 这种机制长出现在多线程的环境下, 当前线程会维护一个技术比较器, 即 expectedModCount, 如果这两个数据不相等则抛出异常; java.util 包下的所有集合类都是 fail-fast, 而 java.util.concurrent 包中的集合类都是 fail-safe 的, 与 fail-fast 不同的是, 遍历时先保存一个快照在遍历, 不会被中途意外的修改打断
+以下 ArrayList.subList() 示例进一步阐述 fail-fast 机制
+```
+public static void main(String[] args) {
+    List<String> masterList = new ArrayList<>();
+    masterList.add("one");
+    masterList.add("two");
+    masterList.add("three");
+    masterList.add("four");
+    masterList.add("five");
+
+    List<String> branchList = masterList.subList(0, 3);
+
+    // 如果注释以下三行代码, 会导致 branchList 操作抛错
+    masterList.remove(0);
+    masterList.add("ten");
+    masterList.clear();
+
+    // 如果下方四行代码正确执行
+    branchList.clear();
+    branchList.add("six");
+    branchList.add("seven");
+    branchList.remove(0);
+
+    // 正常遍历只有一个 seven
+    for (String str : branchList) {
+        System.out.println(str);
+    }
+
+    // 子列表修改会导致主列表改动, 期望输出 ["seven", "four", "five"]
+    System.out.println(masterList);
+}
+```
+但实际上, masterList 的操作导致了 branchList 操作的 fail-fast, 抛出 ConcurrentModificationException 异常; 此外 ArrayList$SubList 类没有实现序列化接口, 不可以序列化  
+在使用迭代器或者使用增强 for (实际也是使用迭代器实现, 可使用 jad 等工具反编译查看) 遍历 List 时, 操作移除非倒数第二个元素时会抛出 ConcurrentModificationException 异常, 而移除倒数第二个元素时, 则能正确执行
+```
+public static void main(String[] args) {
+    List<String> list = new ArrayList<>();
+    list.add("one");
+    list.add("two");
+    list.add("three");
+
+    // 移除倒数第二个元素可以正确执行
+    for (String str : list) {
+        if (str.equals("two")) {
+            list.remove(str);
+        }
+    }
+    // 以上增强 for 反编译结果
+    // do {
+    //     if(!iterator.hasNext())
+    //         break;
+    //     String str = (String)iterator.next();
+    //     if(str.equals("two"))
+    //         list.remove(str);
+    // } while(true);
+
+    System.out.println(list);
+}
+```
+移除倒数第二个元素能正确执行是一个凑巧的结果, iterator.hasNext() 中使用一个 cursor != size 判定是否有下一个元素; 以上代码执行流程是 iterator.hasNext() => iterator.next() => list.remove(), 在 remove() 方法中 size 会自减一, 当循环第三次执行 iterator.hasNext() 时, cursor = 2 并且 size = size - 1 = 2, 所以 break 出循环, 避开了 iterator.next() 中的 checkForComodification(), 此方法用来判断 expectedModCount 和 modCount 是否相等, 如果不相等则抛出 ConcurrentModificationException 异常; 所以在使用迭代器遍历集合时, 请使用迭代器的删除方法, 如果是多线程还需要在 Iterator 遍历时加锁
+```
+Iterator<String> iterator = list.iterator();
+while(iterator.hasNext()){
+    synchronized (Object.class) {
+        String str = iterator.next();
+        if (str.equals("three")) {
+            iterator.remove(str);
+        }
+    }
+}
+```
+或者使用并发容器 CopyOnWriteArrayList 代替 ArrayList, 该容器内部会对 Iterator 加锁; COW 家族 (Copy-On-Write) 实行读写分离, 如果是写操作则复制一个集合, 在新介个内添加和删除数据, 待一切修改完成后再将原集合的引用指向新集合; 这样的好处是可以高并发的对 COW 进行读和遍历操作, 而且不需要加锁, 因为当前集合没有添加任何元素; 使用 COW 时要注意两点: 第一尽量设置合理的容量值, 因为扩容的代价较大, 第二使用批量添加和删除的方法, 避免增加一个元素而复制整个集合的操作; 由于 COW, 会导致内存使用增加和 GC 频繁, 所以 COW 适用于读多写少的场景  
+COW 是 fail-safe 机制的, fail-safe 是在安全的副本上进行遍历的, 集合的修改和遍历是没有任何关系的, 但缺点是读不到最新的数据; 这也是 CAP 理论中的 C(Consistent) 与 A(Avaliability) 的矛盾
+
+#### Map 类集合
+Map 和 Collection 类是平级的接口, 在集合框架图上, 它与 Collection 有这微弱的依赖, 即部分方法返回 Collection 视图, 例如 keySet() 和 values() 方法; Map 类集合中存储的单位是 KV 键值对, Map 类就是使用一定哈希算法形成的一组比较均匀的哈希值作为 Key, Value 值挂在 Key 上; Map 类特点如下
+- Map 取代了旧的抽象类 Dictionary, 有更好的性能
+- 没有重复的 Key, 可以有多个重复的 Value
+- Value 可以是 List, Set, Map 类对象
+- KV 是否允许为 null, 以实现类约束为准
+
+Map 除了传统的增删查改外, 还提供了返回所有的 Key, 所有的 Value, 所有的 KV 键值对, 通常这些视图支持 clear(), remove() 操作, 但是没有实现 add 操作, 细节可查看源码; 以下是各个 Map 类对 KV 是否可以为 null 的约束
+
+| Map 集合类 | Key | Value | Super | JDK | 说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| HashTable | 不允许为 null | 不允许为 null | Dictionary | 1.0 | 线程安全 (过时) |
+| ConcurrentHashMap | 不允许为 null | 不允许为 null | AbstractMap | 1.5 | 锁分段技术或 CAS |
+| TreeMap | 不允许为 null | 允许为 null | AbstractMap | 1.2 | 线程不安全 (有序) |
+| HashMap | 允许为 null | 允许为 null | AbstractMap | 1.2 | 线程不安全 (resize 死链问题) |
+
+在大多数情况下, 使用 ConcurrentHashMap 替换 HashMap 没有任何问题, 在性能上区别也不大, 而且更加安全, 但是需要注意 ConcurrentHashMap 的 KV 不能为 null; 建议在任何 Map 类集合中都避免 KV 为 null
+
+##### 红黑树
