@@ -151,3 +151,243 @@ maximumPoolSize 最大可至 Integer.MAX_VALUE, 是高度可伸缩的线程池
 创建一个固定线程数的线程池
 
 ##### 线程池源码详解
+属性定义部分
+```
+public class ThreadPoolExecutor extends AbstractExecutorService {
+    private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+    private static final int COUNT_BITS = Integer.SIZE - 3;  // MARK: Integer 共 32 位, 最右边 29 位表示工作线程数, 最左边 3 位表示线程池状态
+    private static final int CAPACITY   = (1 << COUNT_BITS) - 1;  // MARK: 线程池容量, 000-11111111111111111111111111111
+
+    // runState is stored in the high-order bits
+    private static final int RUNNING    = -1 << COUNT_BITS;  // MARK: 此状态表示线程池可以接受新任务, 111-0000000000000000000000000000
+    private static final int SHUTDOWN   =  0 << COUNT_BITS;  // MARK: 此状态表示不再接受新任务, 但是可以继续执行队列中的任务, 000-0000000000000000000000000000
+    private static final int STOP       =  1 << COUNT_BITS;  // MARK: 此状态表示不再接受新任务, 并中断正在处理的任务, 001-0000000000000000000000000000
+    private static final int TIDYING    =  2 << COUNT_BITS;  // MARK: 此状态表示所有任务已经被终止, 010-0000000000000000000000000000
+    private static final int TERMINATED =  3 << COUNT_BITS;  // MARK: 此状态表示已清理完现场, 011-0000000000000000000000000000
+
+    // Packing and unpacking ctl
+    private static int runStateOf(int c)     { return c & ~CAPACITY; }  // MARK: CAPACITY 取反, 做与操作后只保留 c 的前三位, 即获取状态
+    private static int workerCountOf(int c)  { return c & CAPACITY; }  // MARK: 获取工作线程数
+    private static int ctlOf(int rs, int wc) { return rs | wc; }  // MARK: runState 和 workerCount 做或运算, 合成一个值
+    ...
+}
+```
+execute() 方法的实现
+```
+public void execute(Runnable command) {
+    if (command == null)
+        throw new NullPointerException();
+    int c = ctl.get();  // MARK: 获取包含线程数以及线程池状态的 Integer 类型数值
+    if (workerCountOf(c) < corePoolSize) {  // MARK: 当工作线程数小于 corePoolSize, 增加 worker
+        if (addWorker(command, true))
+            return;
+        c = ctl.get();  // MARK: 如果新增 worker 失败, 重新获取值, 防止外部已在线程池中加入了新任务
+    }
+    if (isRunning(c) && workQueue.offer(command)) {  // MARK: 如果线程池还在运行中, 则将任务放入队列
+        int recheck = ctl.get();
+        if (! isRunning(recheck) && remove(command))  // MARK: 重新检查, 如果线程池不在运行中, 也成功将任务从队列中移出, 并拒绝该任务
+            reject(command);
+        else if (workerCountOf(recheck) == 0)  // MARK: 如果线程池中无 worker, 则新增 worker
+            addWorker(null, false);
+    }
+    else if (!addWorker(command, false))  // MARK: 如果核心线程和队列都已满, 尝试创建一个线程, 失败则拒绝该任务
+        reject(command);
+}
+```
+execute() 方法中有三次 addWorker, 此外发生拒绝的原因有两个: 线程池状态为非 RUNNING 状态, 或者核心线程和队列都已满, 尝试创建一个线程又失败  
+以下是 addWorker() 方法源码
+```
+private boolean addWorker(Runnable firstTask, boolean core) {
+    retry:
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);  // MARK: 获取线程池状态
+
+        // Check if queue empty only if necessary.
+        if (rs >= SHUTDOWN &&  // MARK: 线程池状态 > SHUTDOWN, 或者线程池状态 >= SHUTDOWN 并且 firstTask != null, 或者线程池状态 >= SHUTDOWN 并且队列为空
+            ! (rs == SHUTDOWN &&
+               firstTask == null &&
+               ! workQueue.isEmpty()))
+            return false;
+
+        for (;;) {
+            int wc = workerCountOf(c);
+            if (wc >= CAPACITY ||
+                wc >= (core ? corePoolSize : maximumPoolSize))  // MARK: worker 数大于 CAPACITY, 或者大于 corePoolSize 或 maximumPoolSize
+                return false;
+            if (compareAndIncrementWorkerCount(c))  // MARK: 使用 CAS 自增 1, 如果成功则跳出循环
+                break retry;
+            c = ctl.get();  // Re-read ctl
+            if (runStateOf(c) != rs)  // MARK: 线程池状态如果发生改变, 则重试循环
+                continue retry;
+            // else CAS failed due to workerCount change; retry inner loop
+        }
+    }
+    // MARK: 开始创建线程
+    boolean workerStarted = false;
+    boolean workerAdded = false;
+    Worker w = null;
+    try {
+        w = new Worker(firstTask);  // MARK: 封装成 worker
+        final Thread t = w.thread;
+        if (t != null) {
+            final ReentrantLock mainLock = this.mainLock;
+            mainLock.lock();  // MARK: 获取锁
+            try {
+                // Recheck while holding lock.
+                // Back out on ThreadFactory failure or if
+                // shut down before lock acquired.
+                int rs = runStateOf(ctl.get());
+
+                if (rs < SHUTDOWN ||
+                    (rs == SHUTDOWN && firstTask == null)) {  // MARK: 当线程池在运行中, 或者为 SHUTDOWN 且 firstTask 为 null
+                    if (t.isAlive()) // precheck that t is startable
+                        throw new IllegalThreadStateException();
+                    workers.add(w);
+                    int s = workers.size();
+                    if (s > largestPoolSize)
+                        largestPoolSize = s;
+                    workerAdded = true;
+                }
+            } finally {
+                mainLock.unlock();
+            }
+            if (workerAdded) {
+                t.start();  // MARK: 启动线程, 注意这里并非是 execute() 方法中的 command 参数
+                workerStarted = true;
+            }
+        }
+    } finally {
+        if (! workerStarted)  // MARK: 如果 worker 启动
+            addWorkerFailed(w);
+    }
+    return workerStarted;
+}
+```
+addWorker 时先利用 compareAndIncrementWorkerCount() 加 1, 再去创建线程, 线程创建失败再减 1 的方式, 比先创建线程, 在加 1 时检查超过了线程数限制再销毁线程的方式代价小的多  
+以下是 Worker 类的实现
+```
+private final class Worker extends AbstractQueuedSynchronizer implements Runnable {
+    /**
+     * This class will never be serialized, but we provide a
+     * serialVersionUID to suppress a javac warning.
+     */
+    private static final long serialVersionUID = 6138294804551838833L;
+
+    /** Thread this worker is running in.  Null if factory fails. */
+    final Thread thread;
+    /** Initial task to run.  Possibly null. */
+    Runnable firstTask;
+    /** Per-thread task counter */
+    volatile long completedTasks;
+
+    /**
+     * Creates with given first task and thread from ThreadFactory.
+     * @param firstTask the first task (null if none)
+     */
+    Worker(Runnable firstTask) {
+        setState(-1); // inhibit interrupts until runWorker
+        this.firstTask = firstTask;
+        this.thread = getThreadFactory().newThread(this);
+    }
+
+    /** Delegates main run loop to outer runWorker  */  // MARK: thread 执行 start() 后, 执行 runWorker() 方法
+    public void run() {
+        runWorker(this);
+    }
+    ...
+}
+```
+使用线程时需要注意以下几点
+- 合理设置各类参数, 应根据实际业务场景来设置合理的工作线程数
+- 线程资源必须通过线程池创建, 不允许在应用中自行显式创建线程
+- 创建线程或线程池时请指定有意义的线程名称, 方便出错时回溯
+
+线程池不允许使用 Executors, 而是通过 ThreadPoolExecutor 的方式创建, 这样的创建方式更加明确线程池的运行规则
+
+#### ThreadLocal
+ThreadLocal 初衷是在线程并发时, 解决变量共享问题, 但由于过度设计, 例如弱引用和哈希碰撞, 导致理解难度大, 使用成本高, 反而成为故障高发点, 容易出现内存泄漏, 脏数据, 共享对象更新等问题
+
+##### 引用类型
+JVM 会自动管理内存的分配与使用, 但在某些场景下, 即使引用可达, 也希望能够根据语义的强弱进行有选择的回收, 以保证系统的正常运行; 根据引用类型语义的强弱来决定垃圾回收的阶段, 可以把引用分为强引用, 软引用, 弱引用和虚引用四类; 后三类引用本质上是可以让开发工程师通过代码来决定对象的垃圾回收时机
+- 强引用, 即 Strong Reference
+即类似 `Object obj = new Object();`, 这样的变量声明和定义就会产生对该对象的强引用, 只要对象有强引用, 并且 GC Roots 可达, 那么在回收内存时, 即使内存耗尽也不会回收该对象
+- 软引用, 即 Soft Reference
+引用力度弱于强引用, 是用于非必须对象的场景, 在即将 OOM 之前, 垃圾回收器会把这些软引用指向的对象加入回收范围, 以便获得更多的内存空间
+- 弱引用, 即 Weak Reference
+引用比前两者更弱, 也是用来描述非必须对象的; 如果弱引用执行的对象值存在弱引用这一条线路, 则下次 YGC 时会被回收, 由于 YGC 的不确定性, 所以在 WeakReference.get() 时需要注意 NPE
+- 虚引用, Phanton Reference
+是一种极弱的引用关系, 定义完成后就无法通过该引用获得指向的对象; 为一个对象设置虚引用的唯一目的就是希望能在这个对象被回收时收到一个系统通知; 虚引用必须与引用队列联合使用, 当垃圾回收时, 如果发现存在虚引用, 就会在回收对象内存前, 把这个虚引用加入与之关联的引用队列中   
+
+##### ThreadLocal 的价值
+ThreadLocal 在定义时可以覆写 initialValue() 方法, 这个方法会在 ThreadLocal.get() 时执行到
+```
+public T get() {
+    Thread t = Thread.currentThread();
+    ThreadLocalMap map = getMap(t);
+    if (map != null) {
+        ThreadLocalMap.Entry e = map.getEntry(this);
+        if (e != null) {
+            @SuppressWarnings("unchecked")
+            T result = (T)e.value;
+            return result;
+        }
+    }
+    return setInitialValue();
+}
+```
+每个线程都有自己的 ThreadPoolMap, 如果 map == null 或者 map.get(this) == null 时会执行 setInitialValue() 方法
+```
+private T setInitialValue() {
+    T value = initialValue();
+    Thread t = Thread.currentThread();
+    ThreadLocalMap map = getMap(t);  // MARK: 就是获取 t.threadLocals
+    if (map != null)
+        map.set(this, value);
+    else
+        createMap(t, value);
+    return value;
+}
+```
+ThreadLocal 有个静态内部类 ThreadLocalMap, ThreadLocalMap 有个静态内部类 Entry, 在 Thread 中的 ThreadLocalMap 属性的赋值是在 ThreadLocal 类中的 createMap() 中进行的; ThreadLocal 与 ThreadLocalMap 有着三组对应的方法: get(), set(), remove(), 在 ThreadLocal 中只做判断和校验, 最终的实现会落在 ThreadLocalMap 上; Entry 继承自 WeakReference, 且没有方法, 只有一个 value 成员变量, 它的 key 是 ThreadLocal 对象; 以下是从栈与堆的内存角度看两者关系
+```
+---------------   ---------------------------------------------------------
+|             |   |  --------------------------    ----------------------  |
+|    Thread   |   |  | ----------------------- |  |   (线程内成员变量)    | |
+|   对象引用 =======> | | ThreadLocalMap 引用 | |  | ThreadLocalMap 对象  | |
+|             |   |  | ----------------------- |  | -------------------  | |
+| ThreadLocal |   |  |       当前线程对象       |  | |   Entry 对象-1   | | |
+|  对象引用-1  |   |  --------------------------   | |-----------------| | |
+|             |   |                               | |    弱引用Key-1   | | |
+| ThreadLocal |   |  ---------------------------  | |                 |  | |
+|  对象引用-1 ======> |   ThreadLocal 对象-1    | <= |     Value-1     |  | |
+|             |   |  ---------------------------  | -------------------  | |
+|             |   |                               |                      | |
+| ThreadLocal |   |  ---------------------------  | -------------------  | |
+|  对象引用-2 ======> |   ThreadLocal 对象-1    | <= |   Entry 对象-1  |  | |
+|             |   |  ---------------------------  | |-----------------|  | |
+| ThreadLocal |   |                               | |   弱引用Key-1   |  | |
+|  对象引用-n  |   |                               | |                 |  | |
+|             |   |                               | |      Value-1    |  | |
+|             |   |                               | -------------------  | |
+|             |   |                                                        |
+---------------   ----------------------------------------------------------
+```
+- 1 个 Thread 有且仅有一个 ThreadLocalMap 对象
+- 1 个 Entry 对象的 Key 弱引用指向一个v ThreadLocal 对象
+- 1 个 ThreadLocalMap 对象存储多个 Entry 对象
+- 1 个 ThreadLocal 对象可以被多个线程所共享
+- ThreadLocal 不持有 Value, Value 由线程的 Entry 对象持有
+
+所有的 Entry 对象都被 ThreadLocalMap 类实例化对象 threadLocals 持有; 当线程对象执行完毕时, 线程对象内的实例属性均会被垃圾回收; 即使线程在执行中, 只要 ThreadLocal 对象引用被置为 null, Entry 的 Key 就会自动在下一次 YGC 时被垃圾回收; 而在 ThreadLocal 使用 set() 和 get() 时, 会将 key == null 的 value 置为 null, 使得 value 能够被垃圾回收; 但是 ThreadLocal 对象通常作为私有静态变量使用, 那么生命周期不会随着线程的结束而结束, 线程使用 ThreadLocal 有三个重要方法
+- set(): 如果没有 set 操作的 ThreadLocal 容易引起脏数据
+- get(): 始终没有 get 操作的 ThreadLocal 对象是没有意义的
+- remove(): 如果没有 remove 操作, 容易引起内存泄漏
+
+SimpleDateFormat 是线程不安全的类, 定义为 static 对象时, 会有数据同步风险, SimpleDateFormat 内部有一个 Calender 对象, 多线程共享时有非常高的概率产生错误, 推荐解决方法就是使用 ThreadLocal
+
+##### ThreadLocal 的副作用
+- 脏数据
+线程池会重用 Thread 对象, 那么与 Thread 绑定的静态属性 ThreadLocal 变量也会被重用, 如果在实现的 run() 方法中不显示的 remove() 清理与线程相关的 ThreadLocal 信息, 那么下一个线程不调用 set() 设置初始值, 则 get() 就重用了线程信息
+- 内存泄漏
+使用 static 修饰了 ThreadLocal, 寄希望于 ThreadLocal 对象失去引用后, 触发弱引用机制来回收 Entry 的 Value 就不现实了, 建议用完 ThreadLocal 后调用 remove() 
