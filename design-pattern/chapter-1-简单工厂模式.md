@@ -45,7 +45,7 @@ public class ConcreteProductA extends AbstractProduct {
 
     @Override
     String getName() {
-        return "A";
+        return name;
     }
 }
 
@@ -58,7 +58,7 @@ public class ConcreteProductB extends AbstractProduct {
 
     @Override
     String getName() {
-        return "B";
+        return name;
     }
 }
 ```

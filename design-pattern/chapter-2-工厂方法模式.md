@@ -1,4 +1,4 @@
-### 工厂方法模式
+### 工厂方法模式 (Factory Method Pattern)
 由于简单工厂模式违背了开放关闭原则, 以及态工厂方法不能继承, 创建实例逻辑集中不易维护等问题, 于是有了工厂方法模式; 在工厂方法模式中, 工厂类也有了对应产品的子类, 产品子类在对应的子类中实例化, 主要解决了简单工厂模式违背开放关闭原则的问题
 
 #### 模式角色
@@ -77,3 +77,8 @@ public class ConcreteProductB extends AbstractProduct {
 
 #### 适用场景
 当一个类希望通过子类来指定创建对象时, 在工厂方法模式中, 对于抽象工厂类只需要提供一个创建产品的接口, 而由其子类来确定具体要创建的对象, 利用面向对象的多态性和里氏代换原则, 在程序运行时, 子类对象将覆盖父类对象, 从而使得系统更容易扩展
+
+>**参考:**
+[大话设计模式](https://book.douban.com/subject/2334288/)  
+[工厂方法模式](https://blog.csdn.net/carson_ho/article/details/52343584)  
+[工厂方法模式](https://design-patterns.readthedocs.io/zh_CN/latest/creational_patterns/factory_method.html)
