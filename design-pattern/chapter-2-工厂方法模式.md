@@ -13,10 +13,12 @@
 
 #### 代码实例
 ```
+// 抽象工厂类
 public abstract class AbstractFactory {
     abstract AbstractProduct create();
 }
 
+// 具体工厂 A 类
 public class ConcreteFactoryA extends AbstractFactory {
 
     @Override
@@ -25,6 +27,7 @@ public class ConcreteFactoryA extends AbstractFactory {
     }
 }
 
+// 具体工厂 B 类
 public class ConcreteFactoryB extends AbstractFactory {
 
     @Override
@@ -33,13 +36,14 @@ public class ConcreteFactoryB extends AbstractFactory {
     }
 }
 
-
+// 抽象产品类
 public abstract class AbstractProduct {
     protected String name;
 
     abstract String getName();
 }
 
+// 具体产品 A 类
 public class ConcreteProductA extends AbstractProduct {
 
     public ConcreteProductA(String name) {
@@ -52,6 +56,7 @@ public class ConcreteProductA extends AbstractProduct {
     }
 }
 
+// 具体产品 B 类
 public class ConcreteProductB extends AbstractProduct {
 
     public ConcreteProductB(String name) {
@@ -65,7 +70,7 @@ public class ConcreteProductB extends AbstractProduct {
 }
 ```
 
-#### 工厂方法模式的优缺点
+#### 优缺点
 
 | 优点 | 缺点    |
 | :--- | :--- |
