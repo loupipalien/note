@@ -2,7 +2,7 @@
 简单工厂模式又称为静态工厂方法 (Static Factory Method) 模式, 它属于类创建型模式; 在简单工厂模式中, 可以根据参数的不同返回不同类的实例, 简单工厂模式专门定义一个类负责创建其他类的实例, 被创建的实例通常都具有共同的父类; 简单工厂模式属于类创建型模式
 
 #### 模式角色
-- Factory: 工厂
+- SimpleFactory: 工厂
 工厂负责实现创建所有产品的内部逻辑
 - AbstractProduct: 抽象产品
 抽象产品是工厂所创建的所有产品的父类, 负责描述所有产品的公共接口
@@ -12,7 +12,7 @@
 #### 代码实例
 ```
 // 工厂类
-public class Factory {
+public class SimpleFactory {
     public static AbstractProduct create(String name) {
         AbstractProduct product = null;
         switch (name.toUpperCase()) {
