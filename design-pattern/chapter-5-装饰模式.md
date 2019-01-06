@@ -1,9 +1,9 @@
-### 装饰模式
+### 装饰模式 (Decorator Pattern)
 动态的给一个对象添加一些额外的职责, 就增加功能来说, 装饰模式比生成子类更加灵活; 策略模式是一种类结构型模式
 
 #### 模式角色
-- AbstractComponent: 抽象组件
-- ConcreteComponent: 具体构件
+- AbstractComponent: 抽象组件类
+- ConcreteComponent: 具体构件类
 - AbstractDecorator: 抽象装饰类
 - ConcreteDecorator: 具体装饰类
 
