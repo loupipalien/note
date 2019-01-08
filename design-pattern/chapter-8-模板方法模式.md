@@ -1,5 +1,5 @@
 ### 模板方法模式 (Template Method Pattern)
-定义一个操作中的算法的骨架, 而将一些步骤延迟到子类, 模板方法使得子类可以不改变一个算法的结构即可重定义该算法的某些特定步骤; 模板方法模式属于对象行为型模式
+定义一个操作中的算法的骨架, 而将一些步骤延迟到子类, 模板方法使得子类可以不改变一个算法的结构即可重定义该算法的某些特定步骤; 模板方法模式属于行为型模式
 
 #### 模式角色
 - AbstractClass: 抽象类
@@ -11,7 +11,7 @@
 ```
 // 抽象类
 public abstract class AbstractClass {
-    abstract void primitiveOperation();
+    public abstract void primitiveOperation();
 
     public void templateMethod() {
         primitiveOperation();

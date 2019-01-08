@@ -1,5 +1,5 @@
 ### 工厂方法模式 (Factory Method Pattern)
-定义一个用于创建对象的接口, 让子类决定实例化哪一个类, 使一个类的实例化延迟到其子类; 工厂方法模式属于对象创建型模式
+定义一个用于创建对象的接口, 让子类决定实例化哪一个类, 使一个类的实例化延迟到其子类; 工厂方法模式属于对创建型模式
 
 #### 模式角色
 - AbstractFactory: 抽象工厂
@@ -15,14 +15,14 @@
 ```
 // 抽象工厂类
 public abstract class AbstractFactory {
-    abstract AbstractProduct create();
+    public abstract AbstractProduct create();
 }
 
 // 具体工厂 A 类
 public class ConcreteFactoryA extends AbstractFactory {
 
     @Override
-    ConcreteProductA create() {
+    public ConcreteProductA create() {
         return new ConcreteProductA("A");
     }
 }
@@ -31,7 +31,7 @@ public class ConcreteFactoryA extends AbstractFactory {
 public class ConcreteFactoryB extends AbstractFactory {
 
     @Override
-    ConcreteProductA create() {
+    public ConcreteProductA create() {
         return new ConcreteProductA("B");
     }
 }
@@ -40,7 +40,7 @@ public class ConcreteFactoryB extends AbstractFactory {
 public abstract class AbstractProduct {
     protected String name;
 
-    abstract String getName();
+    public abstract String getName();
 }
 
 // 具体产品 A 类
@@ -51,7 +51,7 @@ public class ConcreteProductA extends AbstractProduct {
     }
 
     @Override
-    String getName() {
+    public String getName() {
         return name;
     }
 }
@@ -64,7 +64,7 @@ public class ConcreteProductB extends AbstractProduct {
     }
 
     @Override
-    String getName() {
+    public String getName() {
         return name;
     }
 }

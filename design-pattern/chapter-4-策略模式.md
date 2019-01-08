@@ -1,5 +1,5 @@
 ### 策略模式 (Strategy Pattern)
-定义了算法家族, 分别封装起来, 让它们之间可以互相替换, 此模式让算法的变化, 不会影响到使用算法的客户; 策略模式是一种对象行为型模式
+定义了算法家族, 分别封装起来, 让它们之间可以互相替换, 此模式让算法的变化, 不会影响到使用算法的客户; 策略模式是一种行为型模式
 
 #### 模式角色
 - Context: 上下文
@@ -23,13 +23,13 @@ public class Context {
 
 // 抽象策略类
 public abstract class AbstractStrategy {
-    abstract int algorithm(int a, int b);
+    public abstract int algorithm(int a, int b);
 }
 
 // 具体策略 A 类
 public class ConcreteStrategyA extends AbstractStrategy {
     @Override
-    int algorithm(int a, int b) {
+    public int algorithm(int a, int b) {
         return a + b;
     }
 }
@@ -37,7 +37,7 @@ public class ConcreteStrategyA extends AbstractStrategy {
 // 具体策略 B 类
 public class ConcreteStrategyB extends AbstractStrategy {
     @Override
-    int algorithm(int a, int b) {
+    public int algorithm(int a, int b) {
         return a * b;
     }
 }

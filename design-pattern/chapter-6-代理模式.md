@@ -1,5 +1,5 @@
 ### 代理模式 (Proxy Pattern)
-为对象提供一种代理以控制对此对象的访问; 代理模属于类结构性模式
+为对象提供一种代理以控制对此对象的访问; 代理模属于结构性模式
 
 #### 模式角色
 - Subject: 抽象主题类
@@ -11,7 +11,7 @@
 ```
 // 抽象主题类
 public abstract class Subject {
-    abstract void request();
+    public abstract void request();
 }
 
 // 真实主题类
@@ -29,7 +29,7 @@ public class Proxy extends Subject {
     private Subject subject = new RealSubject();
 
     @Override
-    void request() {
+    public void request() {
         subject.request();
     }
 }

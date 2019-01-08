@@ -1,5 +1,5 @@
 ### 建造者模式
-将一个复杂对象的构建与它的表示分离, 使得同样的构建过程可以创建不同的表示; 建造者模式属于对象创建型模式
+将一个复杂对象的构建与它的表示分离, 使得同样的构建过程可以创建不同的表示; 建造者模式属于创建型模式
 
 #### 模式角色
 - Product: 产品类
@@ -38,9 +38,9 @@ public abstract class AbstractBuilder {
 
     protected Product product = new Product();
 
-    abstract void buildPartOne();
+    public abstract void buildPartOne();
 
-    abstract void buildPartTwo();
+    public abstract void buildPartTwo();
 
     public Product getResult() {
         return product;
@@ -51,12 +51,12 @@ public abstract class AbstractBuilder {
 public class ConcreteBuilderA extends AbstractBuilder {
 
     @Override
-    void buildPartOne() {
+    public void buildPartOne() {
         product.add("A Part one.");
     }
 
     @Override
-    void buildPartTwo() {
+    public void buildPartTwo() {
         product.add("A Part two.");
     }
 
@@ -66,12 +66,12 @@ public class ConcreteBuilderA extends AbstractBuilder {
 public class ConcreteBuilderB extends AbstractBuilder {
 
     @Override
-    void buildPartOne() {
+    public void buildPartOne() {
         product.add("B Part one.");
     }
 
     @Override
-    void buildPartTwo() {
+    public void buildPartTwo() {
         product.add("B Part two.");
     }
 
