@@ -119,6 +119,66 @@ template <template T> void permute(Vector<T>& V) { // 随机置乱向量, 使各
 TODO
 
 ##### 判等器与比较器
-TODO
+从算法的角度来看, "判断两个对象是否相等" 与 "判断两个对象的相对大小" 都是至关重要的操作; 为了区别这两种操作, 在后续的叙述中把前者称之为 "比对" 操作, 后者称之为 "比较" 操作
 
 ##### 无序查找
+- 判等器
+只支持比对, 不支持比较的向量, 称为无序向量
+- 顺序查找
+在无序向量中查找任意元素 e 时, 由于没有更多的信息, 只有遍历所有的元素后才能得出查找的结论; 一次逐个比对的查找方式称作为顺序查找 (sequential search)
+- 实现
+```
+template <template T> // 无序向量的顺序查找, 返回最后一个元素 e 的位置, 失败时返回 -1
+Rank Vector<T>::find (T const& e, Rank lo, Rank hi) const {
+    while ((lo < hi--) && (e != _elem[hi]));  // 从后向前顺序查找
+    return hi;  // 若 hi < lo, 则意味着失败, 否则 hi 即命中元素的秩
+}
+```
+- 复杂度
+最坏的情况下, 查找终止于首元素 \_elem[lo], 运行时间为 $ O(hi -lo) = O(n) $; 最好的情况下, 查找命中于末元素 \elem[hi -1], 仅需时间 $ O(1) $; 对于规模相同, 内部组成不同的输入, 渐进运行时间却有本质区别, 故此雷算法也称为输入敏感的 (input sensitive) 算法
+
+##### 插入
+- 实现
+```
+template <template T> // 将 e 作为秩为 r 元素插入
+Rank Vector<T>::insert (Rank r, T const& e) {
+    expand(); // 若有必要需扩容
+    for (int i = _size; i > r; i--)
+        _elem[i] = _elem[i-1]; // 自后向前
+    _elem[r] = e; // 插入元素
+    _size++; // 更新容量
+    return r; // 返回秩
+}
+```
+- 复杂度
+时间主要消耗于后继元素的后移, 线性正比于后缀的长度, 故总体为 $ O(\_size - r + 1) = O(n) $
+
+##### 删除
+- 区间删除: remove(lo, hi)
+```
+template <template T>   // 删除区间 [lo, hi]
+int Vector<T>::remove (Rank lo, Rank hi) {
+    if (lo == hi)  return 0;  // 处于效率考虑, 单独做退化情况的处理
+    while (hi < _size)
+        _elem[lo++] = _elem[hi++]; // [hi, _size) 顺次向前移 hi - lo 个单元
+    _size = lo; // 更新规模, 直接丢弃尾部区间 [lo, _size = hi) 区间
+    shrink(); // 如有必要则缩容
+    return hi - lo; // 返回被删除元素的数目
+}
+```
+- 单元素删除: remove(r)
+```
+template <template T>   // 删除向量中国秩为 r 的元素, 0 < r < size
+int Vector<T>::remove (Rank r) {
+    T e = _elem[r]; // 备份被删除的元素
+    remove(r, r + 1); // 调用区间删除的算法, 等效于对区间 [r, r + 1) 的删除
+    return e; // 返回被删除元素
+}  
+```
+- 复杂度
+时间主要消耗于后继元素的前移, 线性正比于后缀的长度, 故总体为 $ O(\_size - hi + 1) = O(n) $
+- 错误以及意外处理
+上述接口对输入有一定的限制和约定, 其中指定的待删除区间必须落在合法的范围内, 为此输入参数必须满足 $ 0 \leq lo \leq hi \leq \_size $  
+一般的, 输入参数超出接口所约定合法范围的此类问题, 都属于典型的错误 (error) 或者意外 (excepion); 除了以注释的形式加以说明外, 还应该尽可能的对此类情况做更为周全的处理
+
+##### 唯一化
