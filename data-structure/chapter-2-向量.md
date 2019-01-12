@@ -39,8 +39,7 @@ TODO
 
 ##### 基于复制的构造方法
 ```
-template <template T> // 元素类型
-void Vector<T>:: copyFrom(T const* A, Rank lo, Rank hi) {  // 以数组区间 A[lo, hi) 为蓝本复制向量
+template <template T> void Vector<T>:: copyFrom(T const* A, Rank lo, Rank hi) {  // 以数组区间 A[lo, hi) 为蓝本复制向量
     _elem = new T[_capacity = 2 * (hi - lo)];  // 分配空间
     _size = 0;  // 规模清零
     while (lo < hi) {  // A[lo, hi) 内元素逐一复制至 _elem[0, hi - lo)
@@ -129,7 +128,7 @@ TODO
 - 实现
 ```
 template <template T> // 无序向量的顺序查找, 返回最后一个元素 e 的位置, 失败时返回 -1
-Rank Vector<T>::find (T const& e, Rank lo, Rank hi) const {
+Rank Vector<T>::find(T const& e, Rank lo, Rank hi) const {
     while ((lo < hi--) && (e != _elem[hi]));  // 从后向前顺序查找
     return hi;  // 若 hi < lo, 则意味着失败, 否则 hi 即命中元素的秩
 }
@@ -140,8 +139,7 @@ Rank Vector<T>::find (T const& e, Rank lo, Rank hi) const {
 ##### 插入
 - 实现
 ```
-template <template T> // 将 e 作为秩为 r 元素插入
-Rank Vector<T>::insert (Rank r, T const& e) {
+template <template T> Rank Vector<T>::insert(Rank r, T const& e) { // 将 e 作为秩为 r 元素插入
     expand(); // 若有必要需扩容
     for (int i = _size; i > r; i--)
         _elem[i] = _elem[i-1]; // 自后向前
@@ -156,8 +154,7 @@ Rank Vector<T>::insert (Rank r, T const& e) {
 ##### 删除
 - 区间删除: remove(lo, hi)
 ```
-template <template T>   // 删除区间 [lo, hi]
-int Vector<T>::remove (Rank lo, Rank hi) {
+template <template T> int Vector<T>::remove(Rank lo, Rank hi) { // 删除区间 [lo, hi]
     if (lo == hi)  return 0;  // 处于效率考虑, 单独做退化情况的处理
     while (hi < _size)
         _elem[lo++] = _elem[hi++]; // [hi, _size) 顺次向前移 hi - lo 个单元
@@ -168,8 +165,7 @@ int Vector<T>::remove (Rank lo, Rank hi) {
 ```
 - 单元素删除: remove(r)
 ```
-template <template T>   // 删除向量中国秩为 r 的元素, 0 < r < size
-int Vector<T>::remove (Rank r) {
+template <template T> int Vector<T>::remove(Rank r) {  // 删除向量中国秩为 r 的元素, 0 < r < size
     T e = _elem[r]; // 备份被删除的元素
     remove(r, r + 1); // 调用区间删除的算法, 等效于对区间 [r, r + 1) 的删除
     return e; // 返回被删除元素
@@ -182,3 +178,100 @@ int Vector<T>::remove (Rank r) {
 一般的, 输入参数超出接口所约定合法范围的此类问题, 都属于典型的错误 (error) 或者意外 (excepion); 除了以注释的形式加以说明外, 还应该尽可能的对此类情况做更为周全的处理
 
 ##### 唯一化
+视向量是否有序, 该功能有两种实现方式, 以下是无序向量唯一化的算法
+- 实现
+```
+template <template T> int Vector<T>::deduplicate() {  // 删除无须向量中重复元素
+    int oldSize = _size; // 记录原规模
+    Rank i = 1; // 从 _elem[1] 开始
+    while (i < _size) // 自前像后寻找预知雷同者 (至多一个)
+        (find (_elem[i], 0 , i) < 0) ? i++ : remove(i); // 若无雷同者则继续考差其后继, 否则删除雷同者
+    return oldSize - _size; // 向量规模变化量
+}
+```
+- 正确性
+TODO
+- 复杂度
+随着循环的进行, 当前元素的后继持续的严格减少, 经过 n - 2 步迭代后该算法必然终止, 这里所需的时间主要消耗于 find() 和 remove() 两个接口, 因此每步迭代所需时间为 $ O(n) $, 总体复杂度为 $ O(n^2) $
+
+##### 遍历
+- 功能
+为变量专门设置一个遍历接口 traverse(), 以修改或访问每个元素
+- 实现
+```
+template <template T> void Vector<T>::traverse(void (* visit) (T&)) { // 借助函数指针机制
+    for (int i = 0; i < _size; i++)
+        visit(_elem[i]);
+}
+
+template <template T> template <template VST> void Vector<T>::traverse(VST& visit) {  // 借助函数对象机制
+    for (int i = 0; i < _size; i++)
+        visit(_elem[i]);
+}
+```
+- 实例
+TODO
+- 复杂度
+遍历一次的总体时间复杂度为 $ O(n) $
+
+#### 有序向量
+若向量 S[0, n) 中所有元素不仅按线性次序存放, 而且其数值大小也按此序列单调分布, 则称为有序向量 (sorted vector); 与通常的向量一样, 有序向量依然不要求元素互异, 故通常约定其中的元素自前向后构成一个非降序序列, 即对任意 $ 0 \leq i < j < n $ 都有 $ S[i] \leq S[j] $
+
+##### 比较器
+除了与无序向量一样需要支持元素之间的 "判等" 操作, 有序向量的定义中实际还隐含了另一更强的先决条件: 即各元素之间必须能够比较大小
+
+##### 有序性甄别
+作为无序向量的特例, 有序向量可以沿用无序向量的查找算法, 然而得益于元素之间的有序性, 有序向量的查找, 唯一化等操作都可以更快的完成; 因此在实施此类操作前, 都有必须要判断当前向量是否已经有序
+```
+template <template T> int Vector<T>::disordered() const { // 返回向量中逆序相邻元素对的总数
+    int n = 0; // 计数器
+    for (int i = 1; i < _size; i++) { // 逐一检查 _size - 1 对相邻元素
+        if (_elem[i-1] > _elem[i])
+           i++; // 逆序对计数
+    }
+    return n; // 当且仅当 n = 0 时向量有序
+}
+```
+
+##### 唯一化
+出于效率考虑, 为清除无序向量中的重复元素, 一般做法是首先将其转化为有序向量
+- 低效版
+```
+template <template T> int Vector<T>::uniquify() { // 有序向量重复元素剔除算法 (低效版)
+    int oldSize = _size;
+    int i = 1;
+    while (i < _size) // 从前向后逐一对比各相邻元素
+        _elem[i - 1] == _elem[i] ? remove(i) : i++; // 若雷同则剔除后者, 否则转至后一元素
+    return oldSize - _size; // 向量规模变换量
+}
+```
+这里的运行时间主要消耗于 while 循环和 remove 操作, 总体的时间复杂度为 $ O(n) $
+- 改进思路
+以上唯一化过程复杂度过高的根源是, 在对 remove() 接口的各次调用中, 同一元素可能作为后继元素向前移动多次, 且每次仅移动一个元素; 在有序向量中, 重复的元素必然前后紧邻, 可以批量的删除重读元素
+- 高效版
+```
+template <template T> int Vector<T>::uniquify() { // 有序向量重复元素剔除算法 (高效版)
+    Rank i = 0, j = 0; // 各对互异 "相邻" 元素的秩
+    while (++j < _size) { // 注意扫描直至末元素
+        if (_elem[i] != _elem[j])
+            _elem[++i] = _elem[j]; // 发现不同元素时, 向前移至紧邻于前者右侧
+    }
+    _size = ++i; // 截除尾部多于元素
+    shrink();
+    retuin j - i; // 向量规模变化量
+}
+```
+- 复杂度
+while 循环的每一步迭代, 仅需对元素数值做一次比较, 向后移动一到两个位置指针, 并至多向前复制一个元素, 故只需常数时间; 所以时间复杂度为 $ O(n) $
+
+##### 查找
+有序向量 S 中的元素已不再随机分布, 秩 r 是 S[r] 在 S 中按大小的相对位次, 位于 S[r] 前 (后) 的元素均不至于更大 (小); 当所有元素互异时, r 即使 S[r] 中小于 S[r] 的元素数; 一般的, 若小于, 等于 S[r] 的元素各有 i, k 个, 则该元素及其雷同元素应集中分布在 S[i, i + k]  
+基于上述性质, 有序向量的查找操作可以更加高效的完成; 尽管在最坏的情况下, 无序向量的查找操作需要线性时间, 但有序向量的这一效率可以提高至 $ O(log_2n) $
+```
+template <template T> Rank Vector<T>::search(T const& e, Rank lo, Rank hi) const { // 在有序向量的区间 [lo， hi) 内, 确定不大于 e 的最后一个节点的秩
+    return (rand() % 2) ? binSearch(_elem, e, lo, hi) : fibSearch(_elem, e, lo, hi); // 随机选择使用二分查找或者 finbonacci 查找
+}
+```
+
+##### 二分查找 (版本 A)
+- 减而治之
