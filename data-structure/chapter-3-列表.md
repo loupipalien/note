@@ -287,3 +287,117 @@ template <typename T> ListNodePosi(T) List<T>::search(T const& e, int n, ListNod
 线性正比于查找区间的宽度, 平均运行时间为 $ O(n) $
 
 #### 排序器
+##### 统一入口
+```
+template <typename T> void List<T>::sort(ListNodePosi(T) p, int n) { // 列表区间排序
+    swith(rand() % 3) { // 随机选取
+        case 1: insertionSort(p, n); break; // 插入排序
+        case 2: selectionSort(p, n); break; // 选择排序
+        default: mergerSort(p, n); break; // 归并排序
+    }
+}
+```
+
+##### 插入排序
+###### 构思
+插入排序算法适用于包括向量与列表在内的任何序列结构; 算法的思路描述为: 始终将整个序列视作并切分为两部分: 有序的前缀, 无序的后缀; 通过迭代, 反复的将后缀的首元素转移到前缀中; 由此也可看出插入排序算法的不变性: 在任何时刻, 相对于当前节点 e = S[r], 前缀 S[0,r) 总是已经有序的
+
+###### 实例
+TODO
+
+###### 实现
+````
+// 列表的插入排序算法: 对起始于位置 p 的 n 个元素排序
+template <typename T> void List<T>::insertionSort(ListNodePosi(T) p, int n) {
+    for (int r = 0; r < n; r++) { // 逐一对各节点处理
+        insertA(search(p->data, r, p), p->data); // 查找适当的位置并插入
+        p = p->success; // 转向下一节点
+        remove(p->pred); // 移除已排序的节点
+    }
+}
+````
+有多个元素命中 search() 接口时将返回其中最靠后者, 排序之后重复的元素保持其原有次序, 故以上插入排序算法属于稳定算法
+###### 复杂度
+插入排序中insertA() 和 remove() 都是常数时间, 时间消耗主要在的 search() 方法, search() 方法最好时仅需 $O(1)$ 的时间, 最差时需 $O(n)$ ,故平均时间复杂度为 $ O(n^2) $
+
+##### 选择排序
+选择排序 (selectionSort) 也适用于向量与列表之类的序列结构
+###### 构思
+与插入排序类似, 该算法也将序列划分为无序前缀和有序后缀两部分, 此外还要求前缀不大于后缀; 每次只需从前缀中选出最大者, 并作为最小元素转移至后缀中, 即可使有序范围不断扩张; 由此也可以看出选择排序的不变性: 在任何时刻, 后缀 S[r, n) 已经有序, 且不小于前缀 S[0, r)
+
+###### 实例
+TODO
+
+###### 实现
+```
+// 列表的选择排序算法: 对起始于位置 p 的 n 个元素排序
+template <typename T> void List<T>::selectionSort(ListNodePosi(T) p, int n) {
+    ListNodePosi(T) head = p->pred;
+    ListNodePosi(T) tail = p;
+    for (int i = 0; i < n; i++) tail = tail->succ; // 代排序区间为 (head, tail)
+    while (1 < n) { // 在至少还剩两个节点之前, 在待排序区间内
+        ListNodePosi(T) max = selectMax(head->succ, n); // 找出最大者 (歧义时后者优先)
+        insertB(tail, remove(max)); // 将其移动至无序区间末尾 (作为有序区间新的首元素)
+        tail = tail->pred;
+        n--;
+    }
+}
+```
+其中 selectMax() 接口用于在无序列表中定位最大节点
+```
+// 从起始元素位置 p 的 n 个元素选出最大者
+template <typename T> ListNodePosi(T) List<T>::selectMax(ListNodePosi(T) p, int n) {
+    ListNodePosi(T) max = p; // 最大者暂定为首节点 p;
+    for (ListNodePosi(T) cur = p; 1 < n; n--) { // 从首节点出发, 将后续节点逐一与 max 比较
+        if (!lt((cur = cur->succ)->data, max->data); // 若当前元素不小于 max
+            max = cur; // 更新最大者
+    }
+    return max; // 返回最大节点位置
+}
+```
+###### 复杂度
+选择排序中insertB() 和 remove() 都是常数时间, 时间消耗主要在 $O(n)$ 的 selectMax() 方法, 故以上调用 selectMax() 的选择排序hi见复杂度为 $O(n^2)$; 选择排序属于 CBA 式算法, 其下界在 $O(nlogn)$, 后续章节中的高级数据结构可以把 selectMax() 的时间复杂度降低为 $O(logn)$, 从而使选择排序整体的效率提高至 $O(nlogn)$
+
+##### 归并排序
+基于二路归并的向量排序算法, 其构思同样也适用于列表结构
+###### 二路归并的算法实现
+```
+template <template T> void List<T>::merge(ListNodePosi(T) p, int n, List<T>& L, ListNodePosi(T) q, int m) {
+// assert: this.vaild(p) && rank(p) + n <= size && this.sorted(p, n)
+//         L.vaild(q) && rank(q) + m <= L._size && L.sorted(q, m)
+// 注意: 在归并排序之类的场合, 可能 this = L && rank(p) + n = rank(q)
+    ListNodePosi(t) pp = p->pred; // 借助前驱
+    while (0 < m) { // 在 q 尚未移出区间前
+        if ((0 < n) && (p->data <= q->data)) { // 若 p 仍在区间内, 且 v(p) <= v(q)
+            if (q == (p = p->succ)) // p 归入合并的列表, 并替换为其直接后继
+                break;
+            n--;
+        } else { // 若 p 已超出右界, 或 v(q) < v(p)
+            insertB(p, L.remove(q = q->succ)->pred); // 将 q 转移到 p 之前
+            m--;
+        }
+    }
+    p = pp->succ; // 确定归并后区间的起点   
+}
+```
+为了便于递归实现上层的归并排序, 在二路归并的这一版本中, 归并所得的有序列表依然起始于节点 p
+###### 归并时间
+线性正比于两个子列表的长度之和, $O(n + m)$
+###### 特例
+TODO
+###### 分治策略
+```
+// 列表的归并排序算法: 对其实于位置 p 的 n 个元素排列
+template <typename T> void List<T>::mergeSort(ListNodePosi(T) & p, int n) {
+    if (n < 2) return;
+    int m = n >> 1; // 以中点为界
+    ListNodePosi(T) q = p;
+    for (int i = 0; i < m; i++) // 均分列表
+        q = q->succ;
+    mergeSort(p, m); // 对前子列表排序
+    mergeSort(q, n - m); // 对后子列表排序
+    merge(p, m, *this, q, n - m); // 归并
+} // 注意: 排序后, p 依然指向归并后区间的起点
+```
+###### 排序时间
+对长度为 n 的列表做归并排序, 首先需要花费线性时间确定居中的切分节点, 然后递归地对长度均为 n/2 的两个子列表做归并排序, 最后还需花费线性的时间做二路归并, 故时间复杂度为 $O(nlogn)$
