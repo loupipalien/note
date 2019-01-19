@@ -342,3 +342,126 @@ inline Cell* advance(Cell* cell) { // 从当前位置转入相邻格点
 ```
 
 ###### 算法实现
+基于试探回溯策略实现寻径算法
+```
+// 迷宫寻径算法: 在格单元 s 到 t 直接规划一条道路 (如果的确存在)
+bool labyrinth(Cell Laby[LABY_MAX][LABY_MAX], Cell* s, Cell* t) {
+    if ((AVAILABLE != s->status) || (AVAILABLE != t->status)) return false; // 退化情况
+    Stack<Cell*> path; // 用栈记录通路 (Theseus 的线绳)
+    s->incoming = UNKNOWN;
+    s->status = ROUTE;
+    path.push(s); // 起点
+    do { // 从起点出发不断试探, 回溯, 直到抵达终点, 或者穷尽所有可能
+        Cell* c = path.top(); // 检查当前位置 (栈顶)
+        if (c == t) return true; // 若已抵达终点, 则找到了一条路; 否则沿尚未试探的方向继续试探
+        while (NO_WAY > (c->outgoing = nextESWN(c->outgoing))) // 逐一检查所有方向
+            if (AVAILABLE == neighbor(c)->status) break; // 试图找到尚未试探的方向
+        if (NO_WAY <= c->outgoing) { // 若所有方向都已试探过
+            c->status = BACKTRACKED;
+            c = path.pop(); // 则后退回溯一步
+        } else { // 否则向前试探一步
+            path.push(c = advance(c));
+            c->outgoing = UNKNOWN;
+            c->status = ROUTE;
+        }
+    } while (!path.empth());
+    return false;
+}
+```
+这问题的搜索中, 局部解是一条源自于格起点的路径, 随着试探回溯相应的伸长缩短; 因此在这里借助 path 按次序记录组成当前路径的所有格点, 并动态的随着试探回溯做出栈入栈操作; 路径的其实格点, 当前的末端格点分别对应于 path 的栈底和栈顶, 当后者抵达目标格点时搜索成功, 此时 path 所对应的路径应作为全局返回
+###### 实例
+TODO
+###### 正确性
+TODO
+###### 复杂度
+TODO
+
+#### 队列
+##### 概述
+###### 入队和出队
+与栈一样, 队列 (queue) 也是存放数据对象的一种容器, 其中的数据对象也按线性的逻辑次序排列, 队列结构同样支持对象的插入和删除, 但是两种操作的范围分别限制于队列的两端, 若约定新对象只能从某一端插入其中, 从另一端删除已有的元素; 允许取出元素的一端称作对头 (front), 而允许插入元素的另一端称作为队尾 (rear)
+###### 先进先出
+由以上约定则知与栈结构恰恰相反, 队列中各对象的操作次序遵循所谓的先进先出 (first-in-first-out, FIFO) 的规律
+###### ADT 接口
+
+| 操作 | 功能 |
+| :--- | :--- |
+| size() | 报告队列的规模 (元素总数) |
+| empty() | 判断队列是否为空 |
+| enqueue(e) | 将 e 插入队尾 |
+| dequeue(e) | 删除对首对象 |
+| front() | 引用对首对象 |
+###### 操作实例
+TODO
+
+##### Queue 模板类
+作为列表的派生类来实现队列的数据结构
+```
+#include "../List/List.h" // 以 List 作为基类
+template <typename T> class Queue: public List<T> { // 队列模板类 (继承 List 原有接口)
+public: // size(), empty() 以及其它开放接口均可直接沿用
+    void enqueue(T const& e) {
+        insertAsLast(e); // 入队: 尾部插入
+    }
+    T dequeue() {
+        return remove(first()); // 出队: 首部删除
+    }
+    T& front() {
+        return first()->data; // 队首
+    }
+}
+```
+
+#### 队列应用
+##### 循环分配器
+在为客户群体中共享某一资源 (例如多个应用程序共享同一 CPU), 一套公平且高效的分配规则必不可少, 而队列结构则非常适用于定义和实现这样一套分配规则
+```
+RoundRobin { // 循环分配器
+    Queue Q(clients); // 参与资源分配的所有客户组成队列 Q
+    while (!ServiceClosed()) { // 在服务关闭之前
+        e = Q.enqueue(); // 队首客户出队
+        serve(e); // 接受服务
+        Q.dequeue(e); // 重新入队
+    }
+}
+```
+
+##### 银行服务模拟
+使用队列结构实现顾客服务的调度和优化
+```
+struct Customer { // 顾客类
+    int window; // 所属窗口
+    unsigned int time; // 服务时长
+}
+
+void simulate (int nWin, int servTime) { // 按指定窗口数, 服务总时间模拟银行业务
+    Queue<Customer>* windows = new Queue<Customer>[nWin]; // 为每一个窗口创建一个队列
+    for (int now = 0; now < servTime; now++) { // 在接受服务前
+        if (rand() % (1 + nWin)) { // 新顾客以 win/(nWin + 1) 的概率到达
+            Customer c;
+            c.time = 1 + rand() % 98; // 新顾客到达, 服务是时长随机确定
+            c.window = bestWindow(windows, nWin); // 找出最佳 (最短) 的服务窗口
+            windows[c.window].enqueue(c); // 新顾客加入队列
+        }
+        for (int i = 0; i < nWin; i++) { // 分别检查
+            if (!windows[i].empty()) { // 各非空队列
+                if (--windows[i].front.time == 0) { // 队首顾客的服务时长减少一个单位
+                    windows[i].dequeue();  // 服务完毕的顾客出列
+                }
+            }
+        }
+    }
+    delete [] windows; // 释放所有队列
+}
+
+int bestWindow(Queue<Customer> windows[], int nWin) { // 为新到顾客寻找最佳队列
+    int minSize = windows[0].size(), optWin = 0; // 最优队列
+    for (int i = 1; i < nWinl i++) { // 在所有窗口中
+        if (minSize > windows[i].size())  {
+            minSize = windows[i].size();
+            optWin = i; // 挑选出最优队列
+        }
+    }
+    return optWin; // 返回
+}
+```
