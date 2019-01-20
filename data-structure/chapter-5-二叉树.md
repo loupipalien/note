@@ -414,3 +414,279 @@ template <typename T> BinTree* BinTree<T>::secede(BinNodePosi(T) x) {
 二叉树本身不具有天然的全局次序, 故为实现遍历, 首先需要在各节点与其孩子之间约定某种局部次序, 从而间接地定义出全局次序; 按照惯例左孩子优先于右孩子, 故若将节点及其孩子分别记作 V,L,R, 则局部访问次序有 VLR, LVR, LRV 三种选; 根据节点 V 在其中的访问次序, 这三种策略也相应地分别称作先序遍历, 中序遍历, 后序遍历
 
 ###### 先序遍历
+```
+// 二叉树先序遍历算法 (递归版)
+template <typename T, typename VST> void travPre_R(BinNodePosi(T) x, VST& visit) {
+    if (!x) return;
+    visit(x->data);
+    travPre_R(x->lc, visit);
+    travPre_R(x->rc, visit);
+}
+```
+为遍历 (子) 树 x, 首先核对 x 是否为空, 若为空则直接退出, 这也是递归基; 反之若 x 非空, 则按照先序遍历关于局部次序的定义, 优先访问其根节点 x, 然后左子树和右子树, 递归地进行遍历
+```
+// preoredr traversal
+              |
+          --- i ------------------
+          |                      |
+      --- d ------           --- l ---
+      |          |           |       |
+  --- c      --- h       --- k   --- n ---
+  |          |           |       |       |
+  a ---  --- f ---       j       m   --- p
+      |  |       |                   |
+      b  e       g                   o
+
+先序遍历顺序: -> a -> d -> c -> a -> b -> h -> f -> e -> g -> l -> k -> j -> n -> m -> p -> o ->
+```
+###### 后序遍历
+```
+// 二叉树后序遍历算法 (递归版)
+template <typename T, typename VST> void travPre_R(BinNodePosi(T) x, VST& visit) {
+    if (!x) return;
+    travPre_R(x->lc, visit);
+    travPre_R(x->rc, visit);
+    visit(x->data);
+}
+```
+若 x 非空, 则按照后序遍历关于局部次序的定义, 优先访问其左子树, 然后右子树, 最后才访问 x 的递归进行遍历
+```
+// postoredr traversal
+              |
+          --- i ------------------
+          |                      |
+      --- d ------           --- l ---
+      |          |           |       |
+  --- c      --- h       --- k   --- n ---
+  |          |           |       |       |
+  a ---  --- f ---       j       m   --- p
+      |  |       |                   |
+      b  e       g                   o
+
+后序遍历顺序: -> b -> a -> c -> e -> g -> f -> h -> d -> j -> k -> m -> o -> p -> n -> l -> i ->
+```
+###### 中序遍历
+```
+// 二叉树中序遍历算法 (递归版)
+template <typename T, typename VST> void travPre_R(BinNodePosi(T) x, VST& visit) {
+    if (!x) return;
+    travPre_R(x->lc, visit);
+    visit(x->data);
+    travPre_R(x->rc, visit);
+}
+```
+若 x 非空, 则按照中序遍历关于局部次序的定义, 优先访问其左子树, 然后访问 x, 最后访问右子树的递归进行遍历
+```
+// inoredr traversal
+              |
+          --- i ------------------
+          |                      |
+      --- d ------           --- l ---
+      |          |           |       |
+  --- c      --- h       --- k   --- n ---
+  |          |           |       |       |
+  a ---  --- f ---       j       m   --- p
+      |  |       |                   |
+      b  e       g                   o
+
+后序遍历顺序: -> a -> b -> c -> d -> e -> f -> g -> h -> i -> j -> k -> l -> m -> n -> o -> p ->
+```
+各节点在中序遍历序列中的局部次序, 与按照有序树定义所确定的全局左右次序完全吻合
+
+##### 迭代版先序遍历
+无论是递归式还是迭代式遍历算法, 都只需渐进的线性时间, 但递归版遍历算法时间, 空间复杂度的常系数相对迭代版更大
+###### 版本 1
+TODO
+###### 版本 2
+在二叉树 T 中, 从根节点出发沿着左分支一直下行的那条通路称作为最左侧通路 (leftmost path); 若将沿途的节点分别记作 $ L_k, k = 0, 1,, 2,..., d $, 则最左侧通路终止于没有左孩子末端节点 $ L_d $; 若这些节点的右孩子和右子树分别记作 $ R_k $ 和 $ T_k, k = 0, 1,, 2,..., d $; 则该二叉树的先序遍历序列可表示为
+$$
+\begin{align}
+preoredr(T) & = visit(L_0), visit(L_1), ..., visit(L_0); \\
+            & preoredr(T_d), ..., preoredr(T_1), preoredr(T_0);
+\end{align}
+$$
+也就是说, 先序遍历序列可分解为两段: 沿最左侧通路自顶向下访问各节点, 以及自底向上遍历的对应右子树
+```
+// 从当前节点出发, 沿左分支不断深入, 直至没有左分支的节点; 沿途节点遇到后便访问
+template <typename T, typename VST> static void visitAlongLeftBranch(BinNodePosi(T) x, VST& visit, Stack<BinNodePosi(T)>& S) {
+    while (x) {
+        visit(x->data); // 访问当前节点
+        S.push(x-rc); // 右孩子入栈 (可优化, 避免空的右孩子入栈)
+        x = x->lc; // 沿左分支深入一层
+    }
+}
+
+// 二叉树先序遍历: 迭代版 2
+template <typename T, typename VST> void travPre_I2(BinNodePosi(T) x, VST& visit) {
+    Stack<BinNodePosi(T)> S; // 辅助栈
+    while (true) {
+        visitAlongLeftBranch(x, visit, S);
+        if (S.empty()) break; // 直到栈空
+        x = S.pop();
+    }
+}
+```
+
+##### 迭代版中序遍历
+在中序遍历的递归版本中, 尽管右子树的递归遍历是尾递归, 但左子树绝对不是; 实现迭代版的难点正在于此
+###### 版本 1
+类似与先序遍历版本 2 的思路, T 的中序遍历序列可表示如下
+\begin{align}
+inoredr(T) & = visit(L_d), visit(T_d); \\
+           & visit(L_{d-1}), visit(T_{d-1}); \\
+           & ..., ...; \\
+           & visit(L_1), visit(T_1); \\
+           & visit(L_0), visit(T_0);
+\end{align}
+$$
+也就是说, 沿最左侧通路自底向上, 以沿途各节点为界, 中序遍历序列可分解为 d + 1 段; 各段彼此独立, 且均包括访问来自最左侧通路的某一节点 $ L_k $, 以及遍历其对应的右子树 $ T_k $
+```
+// 从当前节点出发, 沿左分支不断深入, 直至没有左分支的节点
+template <typename T> static void goAlongLeftBranch(BinNodePosi(T) x, Stack<BinNodePosi(T)>& S) {
+    while (x) {
+        S.push(x); // 当前节点入栈
+        x = x->lc; // 向左分支深入, 直至无左孩子
+    }
+}
+
+// 二叉树中序遍历: 迭代版 1
+template <typename T, typename VST> void travIn_I1(BinNodePosi(T) x, VST& visit) {
+    Stack<BinNodePosi(T)> S; // 辅助栈
+    while (true) {
+        goAlongLeftBranch(x, S); // 从当前节点出发, 逐批入栈
+        if (S.empty()) break; // 治秩所有节点处理完毕
+        x = S.pop();
+        visit(x->data); // 弹出栈顶节点并访问
+        x = x->rc; // 转向右子树
+    }
+}
+```
+
+###### 直接后继及其定位
+中序遍历的实质功能也可理解为, 为所有节点赋予一个次序, 从而将半线性的二叉树转化为线性结构; 一旦定义了遍历策略, 即可与向量和列表一样, 在二叉树的节点之间定义前驱与后继关系; 其中没有前驱 (后继) 的节点成为首 (末) 节点; succ() 为定位任意节点在中序遍历序列中的直接后继
+```
+template <typename T> BinNodePosi(T) BinNode<T>::succ() { // 定位节点 v 的直接后继
+    BinNodePosi(T) s = this; // 记录后继的临时变量
+    if (rc) { // 若有右孩子, 则直接后继必在右孩子中
+        s = rc;
+        while (HasLChild(*s)) s = s->lc; // 右子树中最靠左的节点
+    } else { // 否则, 直接后继应该是 "将当前节点包含于其左子树中的最低祖先"
+        while (IsRChild(*s)) s = s->parent; // 逆向的沿右向分支, 不断朝左上方移动
+        s = s->parent; // 最后再朝右上方移动一步, 即抵达直接后继 (如果存在)
+    }
+    return s;
+}
+```
+这里共分为两大类情况:
+- 若当前节点有右孩子, 则其直接后继必然存在, 且属于其右子树, 此时只需转入右子树, 再沿该子树的最左侧通路朝左下方深入, 直接抵达子树中最靠左的节点
+- 若当前节点没有右子树, 则若其直接后继存在, 必然为该节点上的某一祖先, 且是将当前节点纳入其左子树的最低祖先, 于是沿着右侧通路朝左上方上升, 当不能继续前进时, 再朝右上方移动一步即可; 若有祖先为 NULL, 这意味着此前沿着右侧通路向上的回溯到达了树根; 也就是说, 当前节点是全树右侧通路的终点, 也是中序遍历的终点
+###### 版本 2
+```
+// 二叉树中序遍历: 迭代版 2
+template <typename T, typename VST> void travIn_I2(BinNodePosi(T) x, VST& visit) {
+    Stack<BinNodePosi(T)> S; // 辅助栈
+    while (true) {
+        if (x) {
+            S.push(x); // 根节点入栈
+            x = x->lc; // 深入遍历左子树
+        } else if (!S.empty()) {
+            x = S.pop(); // 尚未访问的最低祖先节点出栈
+            visit(x->data); // 访问该祖先节点
+            x = x->rc; // 遍历祖先的右子树
+        } else {
+            break; // 遍历完成
+        }
+    }
+}
+```
+版本 2 只是版本 1 的等价形式, 但确实到版本 3 的过渡
+###### 版本 3
+以上迭代式都需使用辅助栈, 所需辅助空间规模线性正比于二叉树的高度, 最坏情况下与节点总数相当; 版本 3 则无需使用任何结构, 总体仅需 O(1) 的辅助空间, 属于就地算法, 但因为需要反复调用 succ(), 时间效率有所倒退
+```
+// 二叉树中序遍历: 迭代版 3
+template <typename T, typename VST> void travIn_I2(BinNodePosi(T) x, VST& visit) {
+    bool backtrack = false; // 前一步是否刚从右子树回溯 (为了省去栈)
+    while (true) {
+        if (!backtrack && HasLChild(*x)) { // 若有左子树且不是刚刚回溯
+            x = x->lc; // 深入左子树
+        } else { // 无左子树或刚回溯
+            visit(x-data); // 访问该节点
+            if (HasRChild(*x)) { // 若右子树非空
+                x = x->rc; // 深入右子树
+                backtrack = false; // 并关闭回溯
+            } else { // 若右子树为空
+                if (!(x = x->succ())) break; // 回溯 (含抵达末节点的退出返回)
+                backtrack = true; // 并设置回溯标识
+            }
+        }
+    }
+}
+```
+这里相当于将原辅助栈替换为了一个标志位 backtrack; 每当抵达一个节点, 借助该标识可判断此前是否刚做过一次自下而上的回溯; 若不是, 则按照中序遍历的策略优先遍历左子树, 反之若刚发生过一次回溯, 则意味着当前节点的左子树已经遍历完毕; 每个节点被访问完毕后, 都应该转向其在遍历序列中的直接后继
+
+##### 迭代版后序遍历
+后序遍历算法的递归版本中, 左右子树的递归遍历均严格不属于尾递归  
+将树 T 画在二维平面上, 并假设所有节点和边均不透明, 从左侧水平向右看去, 未被遮挡的最高叶节点 v, 称作最高左侧可见叶节点 (HLVFL), 即为后序遍历首先访问的节点  
+与先序中序类似, 自底向上的沿着该通路, 整个后序遍历序列也可分解为若干个片段; 在每一片段, 分别起始于通路上的一个节点, 并包括三步: 访问当前节点, 遍历以其右兄弟 (若存在) 为根的子树, 以及向上回溯至其父节点 (若存在) 并转入下一片段
+```
+// 在以S栈顶节点为根的子树中，找到最高左侧可见叶节点
+template <typename T> static void gotoHLVFL(Stack<BinNodePosi(T)>& S) { // 沿途所遇节点依次入栈
+   while (BinNodePosi(T) x = S.top()) // 自顶而下，反复检查当前节点 (即栈顶)
+      if (HasLChild(*x)) { // 尽可能向左
+         if (HasRChild(*x)) S.push ( x->rc ); // 若有右孩子，优先入栈
+         S.push(x->lc); // 然后才转至左孩子
+      } else // 实不得已
+         S.push(x->rc); // 才向右
+   S.pop(); // 返回之前, 弹出栈顶的空节点
+}
+// 二叉树的后序遍历 (迭代版)
+template <typename T, typename VST> void travPost_I(BinNodePosi(T) x, VST& visit) {
+   Stack<BinNodePosi(T)> S; // 辅助栈
+   if (x) S.push (x); // 根节点入栈
+   while (!S.empty()) {
+      if (S.top() != x->parent) // 若栈顶非当前节点之父 (则必为其右兄), 此时需
+         gotoHLVFL (S); // 在以其右兄为根之子树中, 找到HLVFL (相当于递归深入其中)
+      x = S.pop(); visit (x->data); // 弹出栈顶 (即前一节点之后继), 并访问之
+   }
+}
+```
+
+##### 层次遍历
+在所谓的广度优先遍历或者层次遍历 (level-order traversal) 中, 确定节点访问次序可以概括为: 先上后下, 先左后右
+```
+// level-order traversal
+              |
+          --- i ------------------
+          |                      |
+      --- d ------           --- l ---
+      |          |           |       |
+  --- c      --- h       --- k   --- n ---
+  |          |           |       |       |
+  a ---  --- f ---       j       m   --- p
+      |  |       |                   |
+      b  e       g                   o
+
+后序遍历顺序: -> i -> d -> l -> c -> h -> k -> n -> a -> f -> j -> m -> p -> b -> e -> g -> o ->
+```
+###### 算法实现
+```
+// 二叉树层次遍历算法
+template <typename T> template <typename VST> void travLevel( VST& visit) {
+    Queue<BinNodePosi(T)> Q; // 辅助队列
+    Q.enqueue(this); // 根节点入队
+    while (!Q.empty()) { // 在队列变空前反复迭代
+        BinNodePosi(T) x = Q.dequeue();
+        visit(x->data); // 取出队首节点并访问之
+        if (HasLChild(*x)) Q.enqueue(x->lc); // 左孩子入队
+        if (HasRChild(*x)) Q.enqueue(x->rc); // 右孩子入队
+    }
+}
+```
+
+###### 完全二叉树
+完成二叉树的叶节点只能出现在最底层的两层, 且最底层叶节点均处于次底层叶节点的左侧; 完全二叉树的节点数在 $ 2^h $ 至 $ 2_{h+1} - 1 $ 之间, 即规模为 n 的完全二叉树的高度 $ h = \lfloor log_2n \rfloor = O(logn) $; 另外, 叶节点虽不至于少于内部节点, 但至多多出一个
+###### 满二叉树
+完全二叉树的一种特例是满二叉树, 其所有叶节点同处于最底层, 即二叉树的每一层的节点数都应达到饱和; 高度为 h 的满二叉树由 $ 2_{h+1} - 1 $ 节点组成, 其中叶子节点正好比内部节点多一个
+
+#### Huffman 编码
+TODO
