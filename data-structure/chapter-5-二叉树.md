@@ -115,3 +115,302 @@ D ---> E      F
 ```
 
 #### 编码树
+通信中的一个基本问题是: 如何在尽可能低的情况下, 以尽可能高的速度, 尽可能忠实的实现信息在空间和时间上的复制与转移; 信息的传递在信道上大多以二进制比特的形式表示和存在, 而每一个具体的编码方案都对应于一颗二叉编码树
+
+##### 二进制编码
+在加载到信道撒谎功能之前, 信息被转换为二进制形式的过程称为编码 (encoding); 反之, 经信道抵达目标后再由二进制编码恢复原始信息的过程称为解码 (decoding)
+
+##### 生成编码表
+原始信息的基本组成单位称作字符, 它们都来自于某一特定的有限集合 $ \Sigma $, 也称作字符集 (alphabet); 而以二进制形式承载的信息, 都可表示为来自编码表 $ \Gamma $ = {0, 1}* 的某一特定二进制串; 从这个角度讲, 每一编码表都是从字符集 $ \Sigma $ 到编码表  $ \Gamma $ 的一个单射, 编码就是对信息文本中各字符逐个实施这一映射的过程, 而解码则是逆向映射的过程; 编码表一旦确定, 信息的发送方与接收方之间就建立起了一个约定与默契, 从而使得独立的编码与解码成为可能
+
+| 字符 | A | E | G | M | S |
+| :--- | :--- | :--- | :--- | :--- |:--- |
+| 编码 | 00 | 01 | 10 | 110 | 111 |
+
+###### 二进制编码
+所谓编码就是对任意给定的文本, 通过查阅编码表逐一将其中的字符转译为二进制编码; 例如待编码文本为 "MESSAGE"
+
+| 二进制编码 | 当前匹配字符 | 解出原文 |
+| :--- | :--- | :--- |
+| 11001111111001001 | M | M |
+| 01111111001001 | E | ME |
+| 111111001001 | S | MES |
+| 111001001 | S | MESS |
+| 001001 | A | MESSA |
+| 1001| G | MESSAG |
+| 01 | E | MESSAGE |
+
+###### 二进制解码
+接收方依次扫描各比特位, 并经匹配逐一转译出各字符, 从而最终恢复出原始的文本
+
+###### 解码歧义
+在编码方案确定后, 尽管编码结果必然确定, 但解码过程和结果却不见得唯一; 例如若将字符 "M" 的编码由 "110" 改为 "11", 则原始文本 "MESSAGE" 经编码得到二进制码的解法则有至少两种
+
+| 二进制编码 | 当前匹配字符 | 解出原文 | 二进制编码 | 当前匹配字符 | 解出原文
+| :--- | :--- | :--- | :--- | :--- |:--- |
+| 11001111111001001 | M | M | 11001111111001001 | M | M |
+| 01111111001001 | E | ME | 01111111001001 | E | ME |
+| 111111001001 | S | MES | 111111001001 | S | MEM |
+| 111001001 | S | MESS | 1111001001 | S | MEMM |
+| 001001 | A | MESSA | 11001001 | A | MEMMM |
+| 1001| G | MESSAG | 001001| G | MEMMMA |
+| 01 | E | MESSAGE | 1001 | E | MEMMMAG |
+| - | - | - | 01 | E | MEMMMAGE |
+
+###### 前缀无歧义编码
+解码过程中出现歧义甚至错误, 根源在于编码表制订不当; 为了消除匹配歧义, 任何两个原始字符所对应的二进制编码串, 相互都不得是前缀; 反过来, 只要各字符的编码串互不为前缀, 即便出现无法解码的错误, 但绝不会导致歧义, 这类编码方法即所谓的 "前缀无歧义编码 (prefix-free code)", 简称 PFC 编码
+
+##### 二叉编码树
+###### 根通路与节点编码
+任一编码方案都可描述为一颗二叉树: 从根节点出发, 每次向左 (右) 都对应一个 0 (1) 的比特位; 从根节点到每个节点的唯一通路, 可以为各节点 v 赋予一个互异的二进制串, 称作根通路串 (root path string), 记作 rps(v), |rps(v)|  = depth(v) 就是 v 的深度  
+若将 $ \Sigma $ 中的字符分别映射至二叉树的节点, 则字符 x 的二进制编码串即可取做 rps(v(x)); 以下在不致引起混淆的前提下, 不再区分字符 x 和与之对应的节点 v(x), 于是 rps(v(x) 可简记为 rps(x), depth(v(x)) 简记为 depth(x)
+
+###### PFC 编码树
+只要所有字符都对应与叶节点, 歧义现象自然消除, 这也是实现 PFC 编码的简明策略
+
+###### 基于 PFC 编码树的解码
+依据 PFC 编码树也可以便捷的完成编码串的解码; 以 "11001111111001001" 为例, 从前向后扫描该串, 同时在树中相应移动, 起始时从树根出发, 视各比特位的取值相应的向左或者向右深入下一层, 直达叶节点, 匹配字符后重新在回到树根重复这一过程; 这一解码过程可以在二进制编码串的接受过程中实时进行, 而不必等到所有比特位都到达后才开始
+
+###### PFC 编码树的构造
+PFC 编码方案可由 PFC 编码树来描述, 但如何构造编码树?
+
+#### 二叉树的实现
+作为图的特殊形式, 二叉树的基本组成单元是节点和边; 作为数据结构, 其基本的组成实体是二叉树节点 (binary tree node), 而边则对应于节点之间的相互作用
+
+##### 二叉树节点
+###### BinNode 模板类
+```
+#define BinNodePosi(T) BinNode<T>* //节点位置
+#define stature(p) ((p) ? (p)->height : -1) //节点高度（与“空树高度为-1”的约定相统一）
+typedef enum { RB_RED, RB_BLACK} RBColor; //节点颜色
+
+template <typename T> struct BinNode { //二叉树节点模板类
+// 成员（为简化描述起见统一开放，读者可根据需要进一步封装）
+   T data; //数值
+   BinNodePosi(T) parent; BinNodePosi(T) lc; BinNodePosi(T) rc; //父节点及左、右孩子
+   int height; //高度（通用）
+   int npl; //Null Path Length（左式堆，也可直接用height代替）
+   RBColor color; //颜色（红黑树）
+// 构造函数
+   BinNode() :
+      parent ( NULL ), lc ( NULL ), rc ( NULL ), height ( 0 ), npl ( 1 ), color ( RB_RED ) { }
+   BinNode ( T e, BinNodePosi(T) p = NULL, BinNodePosi(T) lc = NULL, BinNodePosi(T) rc = NULL,
+             int h = 0, int l = 1, RBColor c = RB_RED ) :
+      data ( e ), parent ( p ), lc ( lc ), rc ( rc ), height ( h ), npl ( l ), color ( c ) { }
+// 操作接口
+   int size(); //统计当前节点后代总数，亦即以其为根的子树的规模
+   BinNodePosi(T) insertAsLC ( T const& ); //作为当前节点的左孩子插入新节点
+   BinNodePosi(T) insertAsRC ( T const& ); //作为当前节点的右孩子插入新节点
+   BinNodePosi(T) succ(); //取当前节点的直接后继
+   template <typename VST> void travLevel ( VST& ); //子树层次遍历
+   template <typename VST> void travPre ( VST& ); //子树先序遍历
+   template <typename VST> void travIn ( VST& ); //子树中序遍历
+   template <typename VST> void travPost ( VST& ); //子树后序遍历
+// 比较器、判等器（各列其一，其余自行补充）
+   bool operator< ( BinNode const& bn ) { return data < bn.data; } //小于
+   bool operator== ( BinNode const& bn ) { return data == bn.data; } //等于
+};
+```
+这里通过宏 BinNodePosi 来指代节点位置, 使用 stature 返回节点的高度值
+
+###### 成员变量
+BinNode 节点由多个成员变量组成, 它们分别记录了当前节点的父亲和孩子的位置, 节点内存放的数据以及节点的高度等指标, 这些是二叉树的相关算法赖以实现的基础
+```
+     parent                         
+       |                            [lc] [parent] [rc]
+ --- [data] ---                     [      data      ]
+ |            |                     [height|npl|color]
+lChild       rChild
+```
+###### 快捷方式
+二叉树节点状态和性质的常用功能
+```
+// BinNode 状态与性质的判断
+#define IsRoot(x) (!(x).parent)
+#define IsLChild(x) (!IsRoot(x) && (&(x) == (x).parent->lc))
+#define IsRChild(x) (!IsRoot(x) && (&(x) == (x).parent->rc))
+#define HasParent(x) (!IsRoot(x))
+#define HasLChild(x) ((x).lc)
+#define HasRChild(x) ((x).rc)
+#define HasChild(x) (HasLChild(x) || HasRChild(x)) // 至少有一个孩子
+#define HasBothChild(x) (HasLChild(x) && HasRChild(x)) // 同时有两个孩子
+#define IsLeaf(x) (!HasChild)
+
+// 与 BinNode 具有特定关系的节点及指针
+#define sibling(p) (IsLChild(*(p)) ? (p)->parent->rc : (p).parent->lc) // 兄弟
+#define uncle(x) (IsLChild(*((x)->parent)) ? (x)->parent->parent->rc) : (x)->parent->lc) // 叔叔
+#define FromParentTo(x) (IsRoot(x) ? _root : (IsLChild(x) ? (x).parent->lc : (x).parent->rc)) // 来自父亲的引用
+```
+
+##### 二叉树节点操作接口
+###### 插入孩子节点
+```
+template <typename T> BinNodePosi(T) BinNode<T>::insertAsLC(T const& e) {
+    return lc = new BinNode(e, this); // 将 e 作为当前节点的左孩子插入二叉树
+}
+
+template <typename T> BinNodePosi(T) BinNode<T>::insertAsRC(T const& e) {
+    return rc = new BinNode(r, this); // 将 e 作为当前节点的右孩子插入二叉树
+}
+```
+###### 定位直接后继
+TODO
+###### 遍历
+```
+template <typename T> template <typename T> void BinNode<T>::travIn(VST& visit) { // 二叉树中序遍历算法的统一入口
+    swith(rand() % 5) { // 随机选择
+        case 1: travIn_I1(this, visit); break; // 迭代版 1
+        case 2: travIn_I1(this, visit); break; // 迭代版 2
+        case 3: travIn_I1(this, visit); break; // 迭代版 3
+        case 4: travIn_I1(this, visit); break; // 迭代版 4
+        case 5: travIn_I1(this, visit); break; // 迭代版 5
+        default: travIn_R(this, visit); break; // 递归版
+    }
+}
+```
+
+##### 二叉树
+```
+#include "BinNode.h" //引入二叉树节点类
+template <typename T> class BinTree { //二叉树模板类
+protected:
+   int _size; BinNodePosi(T) _root; //规模、根节点
+   virtual int updateHeight ( BinNodePosi(T) x ); //更新节点x的高度
+   void updateHeightAbove ( BinNodePosi(T) x ); //更新节点x及其祖先的高度
+public:
+   BinTree() : _size ( 0 ), _root ( NULL ) { } //构造函数
+   ~BinTree() { if ( 0 < _size ) remove ( _root ); } //析构函数
+   int size() const { return _size; } //规模
+   bool empty() const { return !_root; } //判空
+   BinNodePosi(T) root() const { return _root; } //树根
+   BinNodePosi(T) insertAsRoot ( T const& e ); //插入根节点
+   BinNodePosi(T) insertAsLC ( BinNodePosi(T) x, T const& e ); //e作为x的左孩子（原无）插入
+   BinNodePosi(T) insertAsRC ( BinNodePosi(T) x, T const& e ); //e作为x的右孩子（原无）插入
+   BinNodePosi(T) attachAsLC ( BinNodePosi(T) x, BinTree<T>* &T ); //T作为x左子树接入
+   BinNodePosi(T) attachAsRC ( BinNodePosi(T) x, BinTree<T>* &T ); //T作为x右子树接入
+   int remove ( BinNodePosi(T) x ); //删除以位置x处节点为根的子树，返回该子树原先的规模
+   BinTree<T>* secede ( BinNodePosi(T) x ); //将子树x从当前树中摘除，并将其转换为一棵独立子树
+   template <typename VST> //操作器
+   void travLevel ( VST& visit ) { if ( _root ) _root->travLevel ( visit ); } //层次遍历
+   template <typename VST> //操作器
+   void travPre ( VST& visit ) { if ( _root ) _root->travPre ( visit ); } //先序遍历
+   template <typename VST> //操作器
+   void travIn ( VST& visit ) { if ( _root ) _root->travIn ( visit ); } //中序遍历
+   template <typename VST> //操作器
+   void travPost ( VST& visit ) { if ( _root ) _root->travPost ( visit ); } //后序遍历
+   bool operator< ( BinTree<T> const& t ) //比较器（其余自行补充）
+   { return _root && t._root && lt ( _root, t._root ); }
+   bool operator== ( BinTree<T> const& t ) //判等器
+   { return _root && t._root && ( _root == t._root ); }
+}; //BinTree
+```
+###### 高度更新
+二叉树任一节点的高度, 都等于其孩子节点的最大高度加一; 于是每当某一节点的孩子或后代有所增减, 其高度都有必要及时更新; 然而节点自身很难发现后代的变化, 因此不妨反过来采用另一处理策略: 一旦有节点加入或者离开二叉树, 则更新其所有祖先的高度; 在每一节点 v 处, 只需读出其左右孩子的高度并取二者之间的最大者, 再计入当前节点本身, 就得到了 v 的新高度; 通常还需要从 v 出发沿 parent 指针逆行向上, 依次更新各代祖先的高度记录
+```
+template <typename T> int BinTree<T>::updateHeight(BinNodePosi(T) x) { // 更新节点新高度
+    return x->height = 1 + max(stature(x->lc), stature(x->rc)); // 具体规则因树而异
+}
+
+template <typename T> void BinTree<T>::updateHeightAbove(BinNodePosi(T) x) { // 更新高度
+    while (x) {
+        updateHeight(x);
+        x = x->parent;
+    }
+}
+```
+更新灭一节点本身的高度, 只需执行两次 getHeight() 操作, 两次加法以及两次取最大操作; 不过常数时间, 故 updateHeight() 算法总体运行时间为 O(depth(v) + 1), 其中 depth(v) 为节点 v 的深度; 这一步操作可以进一步优化
+###### 节点插入
+二叉树节点可以通过三种方式插入二叉树中
+```
+template <typename T> BinNodePosi(T) BinNode<T>::insertAsRoot(T const& e) {
+    _size = 1;
+    return _root = new BinNode<T>(e); // 将 e 当作根节点插入空的二叉树
+}
+
+template <typename T> BinNodePosi(T) BinNode<T>::insertAsLC(BinNodePosi(T) x, T const& e) {
+    _size++;
+    x->insertAsLC(e); // e 插入为 x 的左孩子
+    updateHeightAbove(x);
+    return x->lc;
+}
+
+template <typename T> BinNodePosi(T) BinNode<T>::insertAsRC(BinNodePosi(T) x, T const& e) {
+    _size++;
+    x->insertAsRC(e); // e 插入为 x 的右孩子
+    updateHeightAbove(x);
+    return x->lc;
+}
+```
+###### 子树接入
+任一二叉树均可作为另一二叉树的指定节点的左子树或右子树
+```
+// 二叉树子树接入算法: 将 S 当作节点的左子树接入, S 本身置空
+template <typename T> BinNodePosi(T) BinTree<T>::attachAsLC(BinNodePosi(T) x, BinTree<T>* &S) { // x->lc == NULL
+    if (x->lc = S->_root) x->lc->parent = x; // 接入
+    _size += S._size; // 更新数规模
+    updateHeightAbove(x); // 更新祖先高度
+    S->_root = NULL; // 释放原树
+    S->_size = 0;
+    release(S);
+    S = NULL;
+    return x; // 返回接入位置
+}
+
+// 二叉树子树接入算法: 将 S 当作节点的右子树接入, S 本身置空
+template <typename T> BinNodePosi(T) BinTree<T>::attachAsRC(BinNodePosi(T) x, BinTree<T>* &S) { // x->rc == NULL
+    if (x->lc = S->_root) x->rc->parent = x; // 接入
+    _size += S._size; // 更新数规模
+    updateHeightAbove(x); // 更新祖先高度
+    S->_root = NULL; // 释放原树
+    S->_size = 0;
+    release(S);
+    S = NULL;
+    return x; // 返回接入位置
+}
+```
+###### 子树删除
+子树删除过程与子树接入过程相反, 不同的是需要将被摘除子树中的节点, 逐一释放并归还系统
+```
+// 删除二叉树中位置 x 处的节点及其后代, 返回被删除节点的个数
+template <typename T> int BinTree<T>::remove(BinNodePosi(T) x) {
+    FromParentTo(*x) = NULL; // 切断来自父节点的指针
+    updateHeightAbove(x->parent); // 更新祖先高度
+    int n = removeAt(x); // 删除子树
+    _size -= n; // 更新高度
+    return n; // 返回删除节点的个数
+}
+
+// 删除二叉树中位置 x 处的节点及其后代, 返回被删除节点的数值
+template <typename T> static int removeAt(BinNodePosi(T) x) {
+    if (!x) return 0; // 递归基, 空置
+    int n = 1 + removeAt(x->lc) + removeAt(x->rc); // 释放左右子树
+    release(x->data);
+    release(x);
+    return n; // 释放被摘除节点, 并返回删除节点的总数
+}
+```
+###### 子树分离
+子树分离过程与子树删除过程基本一致, 不同的是需要对分离出来的子树重新封装并返回给上层调用者
+```
+// 二叉树子树分离算法: 将子树 x 从当前树中摘除, 将其封装为一颗独立子树返回
+template <typename T> BinTree* BinTree<T>::secede(BinNodePosi(T) x) {
+    FromParentTo(*x) = NULL; // 切断来自父节点的指针
+    updateHeightAbove(x->parent); // 更新原树中所有祖先的高度
+    BinTree<T>* S = new BinTree<T>;
+    S->_root = x; // 新树以 x 为根
+    x-parent = NULL;
+    S->_size = x->size();
+    _size -= S->_size; // 更新规模
+    retunr S; // 返回分离出的子树
+}
+```
+###### 复杂度
+以上算法的中除了更新祖先高度和释放节点等操作, 只需常数时间
+
+#### 遍历
+对于二叉树的访问多可抽象为如下形式: 按照某种约定的次序, 对节点各访问一次且仅一次; 与向量和列表等线性结构一样, 二叉树的这类访问也称作遍历 (traversal); 这一过程也等效于将半线性的树形结构, 转换为线性结构
+
+##### 递归式遍历
+二叉树本身不具有天然的全局次序, 故为实现遍历, 首先需要在各节点与其孩子之间约定某种局部次序, 从而间接地定义出全局次序; 按照惯例左孩子优先于右孩子, 故若将节点及其孩子分别记作 V,L,R, 则局部访问次序有 VLR, LVR, LRV 三种选; 根据节点 V 在其中的访问次序, 这三种策略也相应地分别称作先序遍历, 中序遍历, 后序遍历
+
+###### 先序遍历
