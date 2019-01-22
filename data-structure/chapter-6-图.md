@@ -302,7 +302,7 @@ template <typename Tv, typename Te> void Graph<Tv,Te>::BFS(int s, int& clock) {
     }
 }
 ```
-若顶点 u 处于 UNDISCOVERED 状态, 将边 (v,u) 标记为树边 (tree edge); 当顶点 u 已处于 DISCOVERED 状态 (无向图), 或者处于 VISITED 状态 (有向图), 则意味着边 (v, u) 不属于遍历树, 于是将该边归为跨边 (cross edge); BFS() 遍历完成后, 所有访问过的顶点通过 parent[] 指针依次联接, 从整体上给出了原图某一连通或可达域的一颗遍历树, 称作广度优先搜索树, 简称为 BFS 树 (BFS tree)
+若顶点 u 处于 UNDISCOVERED 状态, 将边 (v,u) 标记为树边 (tree edge); 当顶点 u 已处于 DISCOVERED 状态 (无向图), 或者处于 VISITED 状态 (有向图), 则意味着边 (v, u) 不属于遍历树, 于是将该边归为跨边 (cross edge); BFS(s) 遍历完成后, 所有访问过的顶点通过 parent[] 指针依次联接, 从整体上给出了顶点 s 所属的某一连通或可达域的一颗遍历树, 称作广度优先搜索树, 简称为 BFS 树 (BFS tree)
 
 ##### 实例
 TODO
@@ -314,10 +314,110 @@ BFS(s) 将覆盖起始顶点 s 所属的连通分量或可达分量, 但无法�
 时间方面, 首先复位需要 O(n + e) 的时间, bfs() 本身对所有顶点的枚举共需 O(n) 的时间, 在 BFS() 的所有调用中需耗费 (n + e) 的时间, 故 BFS 搜索总体需要 O(n + e) 的时间
 
 ##### 应用
-TODO
+可以解决连通域分解, 最短路径等问题
 
 #### 深度优先搜索
 ##### 策略
 深度优先搜索 (Depth-First Search, DSF) 选取下一顶点的策略, 可概括为: **优先选取最后一个被访问到的顶点的邻居**; 以顶点 s 为基点的 DFS 搜索, 将首先访问顶点 s, 再从 s 所有未访问到的另据中任取之一, 并以之为基点递归的执行 DFS 搜索
 
 ##### 实现
+```
+// 深度优先搜索 DFS 算法 (全图)
+template <typename Tv, typename Te> void Graph<Tc,Te>::dfs(int s) {
+    reset();
+    int clock = 0;
+    int v = s; // 初始化
+    do {
+        if (UNDISCOVERED == status(v)) { // 一旦遇到尚未发现的顶点
+            DFS(v, clock); // 即从该顶点触发启动一次 DFS
+        }
+    } while(s != (v = (++v % n))); // 按序号检查, 故不重不漏
+}
+
+// 深度优先搜索 DFS 算法 (单个连通域)
+template <typename Tv, typename Te> void Graph<Tv,Te>::DFS(int v, int& clock) {
+    dTime(v) = ++clock;
+    status(v) = DISCOVERED; // 发现当前顶点 v
+    for (int u = firstNbr; -1 < u; u = nextNbr(v, u)) { // 枚举 v 的所有邻居 u
+        switch(status(u)) { // 视其状态分别处理
+            case UNDISCOVERED: // u 尚未发现, 意味支撑树可在此扩展
+                type(v, u) = TREE; parent(u) = v; DFS(v, clock); break;
+            case DISCOVERED: // u 已被发现当尚未访问完毕, 应属于被后代指向的祖先
+                type(v, u) = BACKWARD; break;
+            default:
+                type(v, u) = (dTime(V) < dTime(u)) ? FORWARD: CROSS; break;
+         }
+    }
+    status(v) = VISITED; fTime(v) = ++clock; // 至此当前顶点 v 访问完毕
+}
+```
+在每一递归实例中, 都先将当前顶点 v 标记为 DISCOVERED 状态, 再逐一对其各邻居 u 的状态并做出相应处理, 待其所有邻居均已处理完毕, 将顶点 v 置为 VISITED 状态便可回溯  
+若顶点 u 为 DISCOVERED 状态, 则将边 (v, u) 归为树边 (tree edge), 并将 v 记作 u 的父节点, 此后便可将 u 作为当前节点, 继续递归遍历  
+若顶点 u 处于 DISCOVERED 状态, 则意味着此处发现一个有向环路, 此时 DFS 遍历树中 u 必为 v 的祖先, 故应将边 (v, u) 归为后向边 (back edge)  
+这里为每个顶点 v 都记录了被发现和访问完成的时刻, 对应的时间区间 [dTime(v), fTime(v)] 称作 v 的活跃期 (active duration); 顶点 v 和 u 之间是否存在祖先/后代关系, 完全取决于二者的活跃期是否相互包含  
+对于有向图, 顶点 u 还可能处于 VISITED 状态, 此时只要对比 v 和 u 的活跃期, 即可判定在 DFS 树中 v 是否为 u 的祖先, 若是则边 (v, u) 应归为前向边 (forward edge), 否则二者必然来自相互独立的两个分支, 边 (v, u) 应归为跨边 (cross edge)  
+DFS(s) 返回后, 所有访问过的顶点通过 parent[] 指针依次联接, 从整体上给出了顶点 s 所属的某一连通或可达域的一颗遍历树, 称作深度优先搜索树, 简称为 DFS 树 (DFS tree)
+
+##### 实例
+TODO
+
+##### 复杂度
+空间方面, BFS 搜索使用的空间主要消耗于各顶点的时间标签和状态标记, 二者累计不超过累计 O(n) + O(e) = O(n + e)  
+时间方面, 首先复位需要 O(n + e) 的时间, bfs() 本身对所有顶点的枚举共需 O(n) 的时间, 在 DFS() 的所有调用中需耗费 (n + e) 的时间, 故 DFS 搜索总体需要 O(n + e) 的时间
+
+##### 应用
+深度优先搜索是最为重要的图遍历算法, 可以用于寻找路径, 分解连通分量, 以及判定有向无环图等
+
+#### 拓扑排序
+每一顶点都不会通过边, 指向其在序列中的前驱顶点, 这样的一个序列, 称作原有向图的一个拓扑排序 (topological sorting)
+
+##### 有向无环图
+有向无环图的拓扑排序必然存在, 反之亦然; 这是因为有向无环图对应于偏序关系, 而拓扑排序对应于全序关系; 在顶点数目有限时, 与任一偏序相容的全序必然存在  
+在任意有限偏序集中, 必有极值元素 (未必唯一): 相应的, 任一有向无环图, 也必包含入读为零的顶点, 否则每个顶点都至少有一条入边, 那么这也意味着图中包含环路; 于是, 只要将入度为 0 的顶点 m (及其关联边) 从图中取出, 则剩余的图依然是有向无环图, 故其拓扑排序也必然存在
+
+##### 算法
+TODO
+
+##### 实现
+```
+template <typename Tv, typename Te> //基于DFS的拓扑排序算法
+Stack<Tv>* Graph<Tv, Te>::tSort ( int s ) { //assert: 0 <= s < n
+   reset(); int clock = 0; int v = s;
+   Stack<Tv>* S = new Stack<Tv>; //用栈记录排序顶点
+   do {
+      if ( UNDISCOVERED == status ( v ) )
+         if ( !TSort ( v, clock, S ) ) { //clock并非必需
+            while ( !S->empty() ) //任一连通域（亦即整图）非DAG
+               S->pop(); break; //则不必继续计算，故直接返回
+         }
+   } while ( s != ( v = ( ++v % n ) ) );
+   return S; //若输入为DAG，则S内各顶点自顶向底排序；否则（不存在拓扑排序），S空
+}
+
+template <typename Tv, typename Te> //基于DFS的拓扑排序算法（单趟）
+bool Graph<Tv, Te>::TSort ( int v, int& clock, Stack<Tv>* S ) { //assert: 0 <= v < n
+   dTime ( v ) = ++clock; status ( v ) = DISCOVERED; //发现顶点v
+   for ( int u = firstNbr ( v ); -1 < u; u = nextNbr ( v, u ) ) //枚举v的所有邻居u
+      switch ( status ( u ) ) { //并视u的状态分别处理
+         case UNDISCOVERED:
+            parent ( u ) = v; type ( v, u ) = TREE;
+            if ( !TSort ( u, clock, S ) ) //从顶点u处出发深入搜索
+               return false; //若u及其后代不能拓扑排序（则全图亦必如此），故返回并报告
+            break;
+         case DISCOVERED:
+            type ( v, u ) = BACKWARD; //一旦发现后向边（非DAG），则
+            return false; //不必深入，故返回并报告
+         default: //VISITED (digraphs only)
+            type ( v, u ) = ( dTime ( v ) < dTime ( u ) ) ? FORWARD : CROSS;
+            break;
+      }
+   status ( v ) = VISITED; S->push ( vertex ( v ) ); //顶点被标记为VISITED时，随即入栈
+   return true; //v及其后代可以拓扑排序
+}
+```
+
+##### 实例
+TODO
+
+##### 复杂度
+TODO
