@@ -376,43 +376,119 @@ TODO
 在任意有限偏序集中, 必有极值元素 (未必唯一): 相应的, 任一有向无环图, 也必包含入读为零的顶点, 否则每个顶点都至少有一条入边, 那么这也意味着图中包含环路; 于是, 只要将入度为 0 的顶点 m (及其关联边) 从图中取出, 则剩余的图依然是有向无环图, 故其拓扑排序也必然存在
 
 ##### 算法
-TODO
+同理, 有限偏序集中也必然存在极小元素 (未必唯一), 该元素作为顶点, 出度必然为零; 而在有向无环图的 DFS 搜索中, 首先因访问完成而转换至 VISITED 状态的顶点 m, 也必然具有这一性质  
+进一步的, 根据 DFS 搜索的特性, 顶点 m (及其关联边) 对此后的搜索过程将不起任何作用, 于是下一转至 VISITED 状态的顶点可等效的理解为是从图中剔除顶点 m (及其关联边) 之后的出度为零者, 在拓扑排序中, 该顶点应为顶点 m 的前驱; 由此可见, DFS 搜索过程中各顶点被标记为 VISITED 的次序, 恰好 (按逆序) 给出了一个拓扑排序
 
 ##### 实现
 ```
-template <typename Tv, typename Te> //基于DFS的拓扑排序算法
-Stack<Tv>* Graph<Tv, Te>::tSort ( int s ) { //assert: 0 <= s < n
-   reset(); int clock = 0; int v = s;
-   Stack<Tv>* S = new Stack<Tv>; //用栈记录排序顶点
+// 基于DFS的拓扑排序算法
+template <typename Tv, typename Te> Stack<Tv>* Graph<Tv, Te>::tSort ( int s ) { //assert: 0 <= s < n
+   reset();
+   int clock = 0;
+   int v = s;
+   Stack<Tv>* S = new Stack<Tv>; // 用栈记录排序顶点
    do {
-      if ( UNDISCOVERED == status ( v ) )
-         if ( !TSort ( v, clock, S ) ) { //clock并非必需
-            while ( !S->empty() ) //任一连通域（亦即整图）非DAG
-               S->pop(); break; //则不必继续计算，故直接返回
+      if (UNDISCOVERED == status (v))
+         if (!TSort(v, clock, S)) { // clock 并非必需
+            while (!S->empty()) // 任一连通域（亦即整图）非DAG
+               S->pop(); break; // 则不必继续计算，故直接返回
          }
-   } while ( s != ( v = ( ++v % n ) ) );
-   return S; //若输入为DAG，则S内各顶点自顶向底排序；否则（不存在拓扑排序），S空
+   } while (s != (v = ( ++v % n )));
+   return S; // 若输入为 DAG, 则 S 内各顶点自顶向底排序; 否则（不存在拓扑排序）,S 空
 }
 
-template <typename Tv, typename Te> //基于DFS的拓扑排序算法（单趟）
-bool Graph<Tv, Te>::TSort ( int v, int& clock, Stack<Tv>* S ) { //assert: 0 <= v < n
-   dTime ( v ) = ++clock; status ( v ) = DISCOVERED; //发现顶点v
-   for ( int u = firstNbr ( v ); -1 < u; u = nextNbr ( v, u ) ) //枚举v的所有邻居u
-      switch ( status ( u ) ) { //并视u的状态分别处理
+// 基于DFS的拓扑排序算法（单趟）
+template <typename Tv, typename Te> bool Graph<Tv, Te>::TSort ( int v, int& clock, Stack<Tv>* S ) { //assert: 0 <= v < n
+   dTime(v) = ++clock;
+   status(v) = DISCOVERED;
+   //发现顶点v
+   for (int u = firstNbr(v); -1 < u; u = nextNbr(v, u)) // 枚举 v 的所有邻居 u
+      switch (status(u)) { // 并视 u 的状态分别处理
          case UNDISCOVERED:
-            parent ( u ) = v; type ( v, u ) = TREE;
-            if ( !TSort ( u, clock, S ) ) //从顶点u处出发深入搜索
-               return false; //若u及其后代不能拓扑排序（则全图亦必如此），故返回并报告
+            parent(u) = v;
+            type(v, u) = TREE;
+            if (!TSort(u, clock, S)) // 从顶点 u 处出发深入搜索
+               return false; // 若 u 及其后代不能拓扑排序 (则全图亦必如此), 故返回并报告
             break;
          case DISCOVERED:
-            type ( v, u ) = BACKWARD; //一旦发现后向边（非DAG），则
-            return false; //不必深入，故返回并报告
-         default: //VISITED (digraphs only)
-            type ( v, u ) = ( dTime ( v ) < dTime ( u ) ) ? FORWARD : CROSS;
+            type (v, u) = BACKWARD; // 一旦发现后向边 (非 DAG)
+            return false; // 则不必深入, 故返回并报告
+         default: // VISITED (digraphs only)
+            type (v, u) = (dTime(v) < dTime (u)) ? FORWARD : CROSS;
             break;
       }
-   status ( v ) = VISITED; S->push ( vertex ( v ) ); //顶点被标记为VISITED时，随即入栈
-   return true; //v及其后代可以拓扑排序
+   status (v) = VISITED;
+   S->push(vertex(v)); // 顶点被标记为 VISITED 时, 随即入栈
+   return true; // v 及其后代可以拓扑排序
+}
+```
+
+##### 实例
+TODO
+
+##### 复杂度
+这里引入了额外的栈, 规模不超过顶点总数 O(n), 但空间复杂度与基本深度优先算法一致, 仍为 O(n + e), 时间复杂度也与基本深度优先算法一致, 为 O(n + e)
+
+#### 双连通域分解
+##### 关节点与双连通图
+考察无向图 G, 若删除顶点 v 后 G 所包含的连通域增多, 则 v 称作切割节点 (cut vertex) 或 (articulation point); 反之不包含关节点的图称为双连通图, 任一无向图都可视作若干个极大的双连通子图组成, 这样的每一子图都称作原图的一个双连通域 (bi-connected component)
+
+##### 蛮力算法
+通过 BFS 或 DFS 搜索统计出图 G 所含连通域的数目, 然后逐一枚举每个顶点 v, 暂时将其从图 G 中删去, 并再次通过搜索统计图 G\\{v} 所含的连通数目; 当且仅当图 G\\{v} 包含的连通域多于图 G 时, 顶点 v 是关节点
+
+##### 可行算法
+- DFS 树中的叶节点, 绝不可能是原图中的关节点, 此类顶点的删除不会影响 DFS 树的连通性, 也不会影响原图的连通性
+- DFS 树的根节点若至少有两个分支, 则必是一个关节点
+- 假定内部顶点 C, 若移除顶点 C 导致其一颗真子树与其真祖先之间无法连通, 则 C 必为关节点; 反之, 若 C 的所有真子树都能与 C 的某一祖先连通, 则 C 就不可能是关节点; 因此只要在 DFS 搜索中记录并更新各顶点 v 所能 (经后向边) 连通的最高祖先 (highest connected ancestor, HCA) hca[v], 即可及时认定关节点, 并报告对应的双连通域
+
+##### 实现
+```
+// 基于 DFS 的 BCC 分解算法
+template <typename Tv, typename Te> void Graph<Tv,Te>::bbc(int s) {
+    reset();
+    int clock = 0;
+    int v = s;
+    Stack<int> S; // 用栈记录已访问的顶点
+    do {
+        if (UNDISCOVERED == status(v)) { // 一旦发现未发现的顶点 (新连通分量)
+            BBC(v, clock, S); // 从该顶点出发启动一次 BBC
+            S.pop(); // 遍历返回后, 弹出栈中的最后一个顶点, 当前连通域的起点
+        }
+    }
+}
+
+// 利用闲置的 fTime[] 充当 hca[]
+#define hca(x) (fTime(x))
+
+template <typename Tv, typename Te> void Graph<Tv,Te>::BBC(int v, int& clock, Stack<int>& S) {
+    hca(v) = dTime(v) = ++clock;
+    status(v) = DISCOVERED;
+    S.pop(v); // v 被发现并入栈
+    for (int u = firstNbr(v); -1 < u; u = nextNbr(v, u)) { // 枚举 v 的所有邻居 u
+        switch(status(u)) { // 并视 u 的状态分别处理
+            case UNDISCOVERED:
+                parent(u) = v;
+                type(v, u) = TREE;
+                BCC(u, clock, S); // 从顶点 u 处深入
+                if (hca(u) < dTime(v)) { // 遍历返回后若发现 u (通过后向边) 可指向 v 的真祖先
+                    hca(v) = min(hca(v), hca(u)); // 则 v 亦必如此
+                } else { // 否则, 以 v 为关节点 (u 以下即是一个 BBC, 且其中顶点此时集中于栈 S 的顶部)
+                    while(v != S.pop()); // 依次弹出当前 BBC 中的顶点
+                    S.push(v); // 最后一个顶点 (关节点重新入栈), 分摊一次不足
+                }
+                break;
+            case DISCOVERED:
+                type(v, u) = BACKWARD; // 标记 (v, u), 并按照 "越小越高" 的原则
+                if (u != parent(v)) {
+                    hca(v) = min(hca(v), dTime(u)); // 更新 hca(v)
+                }
+                break;
+            default:
+                type(v, u) = (dTime(v) < dTime(u)) ? FORWARD : CROSS;
+                break;
+        }
+    }
+    status(v) = VISITED; // 对 v 的访问结束
 }
 ```
 
@@ -421,3 +497,48 @@ TODO
 
 ##### 复杂度
 TODO
+
+#### 优先级搜索
+##### 优先级与优先级数
+BFS 与 DFS 的差异体现在每一步迭代中对新顶点的选取策略不同, 每一种选取策略等效于给所有顶点赋予不同的优先级, 而且随着算法的推进不断调整, 每一步迭代所选取的顶点都是当时优先级最高者; 按照这种理解, 所有的图搜素都可纳入统一框架, 由于优先级的重要性, 故称作优先级搜索 (priority-first search, PFS); 基于以上, 提供了 priority() 接口, 以支持对顶点优先级数 (priority number) 的读取与修改
+
+##### 基本框架
+```
+// 优先级搜索 (全图)
+template <typename Tv, typename tE> template <template PU> void Graph<Tv,Te>::pfs(int s, PU prioUpdater) {
+    reset();
+    int v = s;
+    do {
+        if (UNDISCOVERED == status(v)) { // 一旦遇到为发现的顶点
+            PFS(v, prioUpdater); // 即从该顶点出发启动一次 PFS
+        }
+    } while (s != (v = (++v % n))); // 按序号检查
+}
+
+// 优先级搜索 (单个连通域)
+template <typename Tv, typename Te> template <typename PU> void Graph<Tv,Te>::PFS(int s, PU prioUpdater) {
+    priority(s) = 0;
+    status(s) = VISITED;
+    parent(s) = -1; // 初始化, 起点 s 加入 PFS 树中
+    while(1) { // 下一顶点和边加至 PFS 树中
+        for (int w = firstNbr(v); -1 < w; w = nextNbr(v, w)) { // 枚举 v 的所有邻居 w
+            prioUpdater(this, s, w); // 更新顶点 w 的优先级及其父顶点
+        }
+        for (int shortest = INT_MAX, w = 0; w < n; w++) {
+            if (UNDISCOVERED == status(w)) { // 从尚未加入遍历树的顶点中选出下一个
+                if (shortest > priority(w)) {
+                    shortest = priority(w);
+                    s = w; // 优先级最高的顶点 s
+                }
+            }
+        }
+        if (VISITED == status(s)) break; // 直至所有顶点均已加入
+        status(s) = VISITED;
+        type(parent(s), s) = TREE; // 将 s 及其父的联边加入遍历树
+    }
+}
+```
+这里借助函数对象 prioUpdater 是算法可以根据不同的问题需求, 简明的描述和实现对应的更新策略; 具体的只需重定义 prioUpdater 对象即可, 而不必重复实现公共部分
+
+##### 复杂度
+PFS 搜索由两重循环构成, 若采用邻接表实现方式, 同时假定 prioUpdater() 只需要常数时间, 则前一循环累计为所有顶点的出度总和 O(e), 后一循环固定迭代 n 次, 故总体时间复杂度为 $ O(n^2) $
