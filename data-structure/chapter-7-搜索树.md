@@ -88,3 +88,4 @@ template <typename T> BinNodePosi(T) & BST<T>::search(const T& e) {
     return searchIn(_root, e, _hot = NULL);
 } // 返回节点位置, 以便后续插入和删除操作
 ```
+###### 语义约定
