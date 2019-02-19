@@ -28,7 +28,7 @@ ChannelHandler 的实现负责接收并响应事件通知, 在 Netty 应用程�
 Echo 服务器会响应传入的消息, 所以需要实现 ChannelInboundHandler 接口, 这里可以直接使用此接口的默认实现 ChannelInboundHandlerAdapter; Echo 服务器中使用到的方法有
 - channelRead(): 对每个传入的消息都要调用
 - channelReadComplete(): 通知 ChannelInboundHandler 最后一次对 channelRead() 的调用是当前批量读取中的最后一条消息
-- excepionCaught(): 在读取操作期间, 有异常抛出时会调用
+- exceptionCaught(): 在读取操作期间, 有异常抛出时会调用
 
 EchoServerHandler 代码
 ```
@@ -58,7 +58,7 @@ public class EchoServerHandler extends ChannelInboundHandlerAdapter {
 }
 ```  
 >**如果不捕获异常, 会发生什么**
-每个 Channel 都拥有一个与之相关联的 ChannelPipeline, 其持有一个 ChannelHandler 的实例链; 在默认情况下, ChannelHandler 会把对它的方法调用转发给链中的下一个 ChannelHandler; 因此, 如果 excepionCaught() 方法没有被该链中的某处实现, 那么所接收的异常将会被传递到 ChannelPipeline 的尾端并被记录; 为此, 应用程序应该至少有一个实现了 excepionCaught() 方法的 ChannelHandler
+每个 Channel 都拥有一个与之相关联的 ChannelPipeline, 其持有一个 ChannelHandler 的实例链; 在默认情况下, ChannelHandler 会把对它的方法调用转发给链中的下一个 ChannelHandler; 因此, 如果 exceptionCaught() 方法没有被该链中的某处实现, 那么所接收的异常将会被传递到 ChannelPipeline 的尾端并被记录; 为此, 应用程序应该至少有一个实现了 exceptionCaught() 方法的 ChannelHandler
 
 请记住以下这些关键点
 - 针对不同类型的事件来调用 ChannelHandler
@@ -131,3 +131,9 @@ Echo 客户端将会
 - 发送一个或多个消息
 - 对于每个消息, 等待并接收从服务器发回的相同的消息
 - 关闭连接
+
+##### 通过 ChannelHandler 实现客户端逻辑
+客户端将拥有一个用来处理数据的 ChannelInboundHandler, 这里使用扩展 SimpleChannelInboundHandler 类处理任务, 需要重写以下方法
+- channelActive(): 在到服务器的连接已经建立后将被调用
+- channelRead0(): 当从服务器接收到一条消息时被调用
+- exceptionCaught(): 在处理过程中引发异常时被调用
