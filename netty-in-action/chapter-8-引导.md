@@ -72,4 +72,103 @@ ServerChannel 的实现负责创建子 Channel, 这些子 Channel 代表了以�
 ```
 
 ##### 从 Channel 引导客户端
-假设服务器正在处理一个客户端的请求, 这个请求需要它充当第三方系统的客户端, 在这种情况下需要从已经被接受的子 Channel 中引导一个客户端 Channel; 可以通过创建一个新的 Bootstrap 实例, 但这不是最高效的方式, 因为它将要求为每个新创建的客户端 Channel 定义另一个 EventLoop, 这会产生额外的线程, 以及在已被接受的子 Channel 和客户端 Channel 之间交换数据时不可避免的上下文切换; 一个更好的解决方案是, 
+假设服务器正在处理一个客户端的请求, 这个请求需要它充当第三方系统的客户端, 在这种情况下需要从已经被接受的子 Channel 中引导一个客户端 Channel; 可以通过创建一个新的 Bootstrap 实例, 但这不是最高效的方式, 因为它将要求为每个新创建的客户端 Channel 定义另一个 EventLoop, 这会产生额外的线程, 以及在已被接受的子 Channel 和客户端 Channel 之间交换数据时不可避免的上下文切换; 一个更好的解决方案是, 通过将一被接受的子 Channel 的 EventLoop 传递给 Bootstrap 的 group() 方法来共享 EventLoop, 因为分配给 EventLoop 的所有 Channel 都使用相同的一个线程, 所以避免了额外的线程的创建以及线程上下文切换
+```
+---------------------                       
+|        (1)        |               ---------------------     
+| ServerBootstrap  bind()  ------>  | ServerChannel (2) |
+|                   |               ---------------------
+--------------------                        |
+                                            |
+        -------------------------------------                                            
+        |
+        v                  --------------
+  ---------------          |            |                 ---------------
+  | Channel (3) |  ------> | Bootstrap connect() -------> | Channel (5) |
+  ---------------          |            |  (4)            ---------------
+        |                   --------------                     |
+        |                                                      |
+        |                   --------------                     |
+        ------------------> | EventLoop  | <--------------------
+                            --------------
+(1): 在 bind() 方法被调用时, ServerBootstrap 将创建一个新的 ServerChannel
+(2): ServerChannel 接受新的连接, 并创建子 Channel 来处理它们
+(3): 为已被接受的连接创建子 Channel
+(4): 由子 Channel 创建的 Bootstrap 类的实例将在 connect() 方法被调用时创建新的 Channel
+(5): EventLoop 在 ServerChannel 所创建子 Channel 以及由 connect() 方法创建 Channel 之间共享             
+```
+实现 EventLoop 共享涉及通过调用 group() 方法来设置 EventLoop
+```
+// 设置 EventLoopGroup, 其将提供用以处理 Channel 事件的 EventLoop
+new ServerBootstrap().group(new NioEventLoopGroup(), new NioEventLoopGroup())
+    .channel(NioServerSocketChannel.class)
+    .childHandler(new SimpleChannelInboundHandler<ByteBuf>() {
+        ChannelFuture connectFuture;
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {\
+            // 创建一个 Bootstrap 实例以连接远程主机
+            Bootstrap bootstrap = new Bootstrap();
+            connectFuture = bootstrap.channel(NioSocketChannel.class)
+                .handler(new SimpleChannelInboundHandler<ByteBuf>() {
+                    @Override
+                    protected void channelRead0(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) throws Exception {
+                        System.out.println("Receive data.");
+                    }
+                }).group(ctx.channel().eventLoop()) // 使用与分配给被接受的子 Channel 相同的 EventLoop
+                .connect(new InetSocketAddress("www.manning.com", 80));
+        }
+
+        @Override
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) throws Exception {
+            if (connectFuture.isDone()) {
+                // do something with the data
+            }
+        }
+    }).bind(new InetSocketAddress(8080))  // 绑定该 ServerSocketChannel
+    .addListener(new ChannelFutureListener() {
+        @Override
+        public void operationComplete(ChannelFuture channelFuture) throws Exception {
+            if (channelFuture.isSuccess()) {
+                System.out.println("Server bind.");
+            } else {
+                System.err.println("Bind failed.");
+                channelFuture.cause().printStackTrace();
+            }
+        }
+    });
+```
+在 Netty 中尽可能的重用 EventLoop, 以减少线程创建所带来的开销
+
+#### 在引导过程中添加多个 ChannelHandler
+Netty 提供了一个特殊的 ChannelInboundHandlerAdapter 的子类, ChannelInitializer, 它的 initChannel() 方法提供了将多个 ChannelHandler 添加到一个 ChannelPipeline 中的能力; 只需要简单的向 ServerBootstrap 或者 Bootstrap 实例提供 ChannelInitializer 实现即可, 一旦 Channel 被注册到了它的 EventLoop 之后, 就会调用 ChannelInitializer 实现的 initChannel() 方法, 在该方法返回后, ChannelInitializer 的实例就会从 ChannelPipeline 中移除自己
+
+#### 使用 Netty 的 ChannelOption 和属性
+每个 Channel 创建时都手动配置可能会相当复杂, 这可以通过使用 option() 方法来将 ChannelOption 应用到引导, 所提供的值会被自动应用到引导所创建的所有 Channel; 可用的 ChannelOption 包括了底层连接的详细信息, 如 keep-alive 或者超时属性以及缓冲区设置, 如果没有对应的预置属性和数据, Netty 提供了 AttributeMap 抽象以及 AttributeKey<T>, 使用这些工具可以将任何类型数据项与 Channel 相关联了
+
+#### 引导 DatagramChannel
+除了基于 TCP 协议的 ServerSocket, Bootstrap 类也可以用于无连接协议, Netty 提供了各种 DatagramChannel 的实现; 唯一的区别就是不再调用 connect() 方法, 而是只调用 bind 方法
+```
+new Bootstrap().group(new OioEventLoopGroup())
+    .channel(OioDatagramChannel.class)
+    .handler(new SimpleChannelInboundHandler<ByteBuf>() {
+        @Override
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) throws Exception {
+            // do something with the data
+        }
+    }).bind(new InetSocketAddress(0))  // 调用 bind() 方法, 因为该协议是无连接的
+    .addListener((ChannelFuture future) -> {
+        if (future.isSuccess()) {
+            System.out.println("Server bind.");
+        } else {
+            System.err.println("Bind failed.");
+            future.cause().printStackTrace();
+        }
+    });
+```
+
+#### 关闭
+关闭 Netty 最重要的是关闭 EventLoopGroup, 它将处理任何挂起的事件和任务, 并随后释放所有活动的线程, 这就是调用 EventLoopGroup.shutdownGracefully() 方法的作用; 需要注意的是该方法是一个异步方法, 所以需要阻塞等待直到它完成, 或者向返回的 Future 注册一个监听器以在关闭完成时获得通知
+
+#### 小结
+TODO
