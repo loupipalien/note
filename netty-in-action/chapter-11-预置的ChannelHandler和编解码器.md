@@ -287,3 +287,120 @@ public class IdleStateHandlerInitializer extends ChannelInitializer<Channel> {
 如果连接超过 60 秒没有接受或者发送任何的数据, 那么 IdleStateHandler 将会使用一个 IdleStateEvent 事件来调用 fireUserEventTriggered() 方法, HeartbeatHandler 实现了 userEventTriggered() 方法, 如果这个方法检测到 IdleStateEvent 事件, 它将会发送心跳信息, 并且添加一个将在发送操作失败时关闭该连接的 ChannelFutureListener
 
 #### 解码基于分隔符的协议和基于长度的协议
+##### 基于分隔符的协议
+基于分隔符的 (delimited) 消息协议使用定义的字符来标记消息或者消息段 (通常称为帧) 的开头或结尾; 以下是 Netty 提供的解码器
+
+| 类名 | 描述 |
+| :--- | :--- |
+| DelimiterBasedFrameDecoder | 使用任何由用户提供的分隔符来提取帧的通用解码器 |
+| LineBasedFrameDecoder | 提取由行尾符 (\n 或者 \r\n) 分隔的帧的解码器,这个解码器比 DelimiterBasedFrameDecoder 更快 |
+
+下图展示了当帧由行尾序列 \r\n 分隔是如何被处理的
+```
+       字节流                   帧          帧
+------------------         ----------- -----------
+| ABC\r\nDEF\r\n | ------> | ABC\r\n | | DEF\r\n |
+------------------         ----------- -----------
+```
+以下代码展示如何使用 LineBasedFrameDecoder
+```
+public class LineBasedHandlerInitializer extends ChannelInitializer<Channel> {
+
+    @Override
+    protected void initChannel(Channel channel) throws Exception {
+        ChannelPipeline pipeline = channel.pipeline();
+        // 该 LineBasedFrameDecoder 将提取的帧转发给下一个 ChannelInboundHandler
+        pipeline.addLast(new LineBasedFrameDecoder(64 * 1024));
+        pipeline.addLast(new FrameHandler());
+    }
+
+    public static final class FrameHandler extends SimpleChannelInboundHandler<ByteBuf> {
+        // 传入单个帧的内容
+        @Override
+        protected void channelRead0(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) throws Exception {
+            // do something
+        }
+    }
+}
+```
+
+##### 基于长度的协议
+基于长度的协议将通过对它的长度编码到帧的头部来定义帧, 而不是使用特殊的分隔符来标记帧的结束; 以下是 Netty 提供的用于处理此类协议的两个解码器
+
+| 类名 | 描述 |
+| :--- | :--- |
+| FixedLengthFrameDecoder | 提取在调用构造函数时指定的定长帧 |
+| LengthFieldBasedFrameDecoder | 根据编码进帧头部中的长度值提取帧, 该字段的偏移量以及长度在构造函数中指定 |
+
+下图展示了 FixedLengthFrameDecoder 指定帧长为 8 的处理
+```
+       字节流                   帧          帧
+------------------         ---------  --------- ---------  ---------
+|     32 字节    | ------> | 8 字节 | | 8 字节 | | 8 字节 | | 8 字节 |
+------------------         ---------  --------- ---------  ---------
+```
+
+#### 写大型数据
+Netty 是异步框架, 其写操作是非阻塞的, 所以即使没有写出所有的数据, 写操作也会在完成时返回并通知 ChannelFuture; 当这种情况发生时, 如果仍然不停的写入, 就有内存耗尽的风险; 所以写大型数据需要准备好处理到远程节点的连接是慢连接的情况, 这种情况会导致内存释放的延迟  
+Netty 的 NIO 支持零拷贝特性, 这种特性消除了将文件内容从文件系统移动到网络栈的复制过程; 以下利用零拷贝实现传输一个文件的内容
+```
+FileInputStream in = new FileInputStream(file);
+FileRegion region = new DefaultFileRegion(in.getChannel(), 0, file.length());
+channel.writeAndFlush(region).addListener((ChannelFuture future) -> {
+    if (!future.isSuccess()) {
+        // 处理失败
+        Throwable cause = future.cause();
+    }
+});
+```
+这个示例只适合于文件内容的传输, 不包括应用程序对数据的任何处理; 在需要将数据从文件系统复制到用户内存时, 可以使用 ChunkedWriteHandler, 它支持异步写大量数据, 又不会导致大量的内存消耗  
+Netty 预置了四个 ChankedInput<B> 接口的实现 (其中 B 代表的是 readChunk() 方法返回的类型), 每个都代表了一个将由 ChunkedWriteHandler 处理的不定长度的数据流
+
+| 类名 | 描述 |
+| :--- | :--- |
+| ChunkedFile | 从文件中逐块获取数据, 当平台不支持零拷贝或者在需要转换数据时使用 |
+| ChunkedNioFile | 和 ChunkedFile 类似, 只是它使用了 FileChannel |
+| ChunkedStream  | 从 InputStream 中逐块传输内容 |
+| ChunkedNioStream | 从 ReadableByteChannel 中逐块传输内容 |
+
+当 Channel 的状态变为活动时, WriteStreamHandler 将会逐块的把来自文件中的数据作为 ChunkedStream 写入
+```
+public class ChunkedWriteHandlerInitializer extends ChannelInitializer<Channel> {
+    private final File file;
+    private final SslContext sslCtx;
+
+    public ChunkedWriteHandlerInitializer(File file, SslContext sslCtx) {
+        this.file = file;
+        this.sslCtx = sslCtx;
+    }
+
+    @Override
+    protected void initChannel(Channel channel) throws Exception {
+        ChannelPipeline pipeline = channel.pipeline();
+        pipeline.addLast(new SslHandler(sslCtx.newEngine(channel.alloc())));
+        // 添加 ChunkedWriteHandler 以处理作为 ChunkedInput 传入的数据
+        pipeline.addLast(new ChunkedWriteHandler());
+        pipeline.addLast(new WriteStreamHandler());
+    }
+
+    public final class WriteStreamHandler extends ChannelInboundHandlerAdapter {
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            super.channelActive(ctx);
+            // 当连接建立时, WriteStreamHandler 就开始写数据
+            ctx.writeAndFlush(new ChunkedStream(new FileInputStream(file)));
+        }
+    }
+}
+```
+
+#### 序列化数据
+##### 使用 JDK 序列化
+TODO
+##### 使用 JBoss Marshalling 序列化
+TODO
+##### 使用 Protocol Buffers 序列化
+TODO
+
+#### 小结
+TODO
