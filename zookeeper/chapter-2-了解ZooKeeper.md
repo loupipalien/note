@@ -28,3 +28,4 @@ znode 节点可以是持久节点 (persistent) 节点, 还可以是临时 (ephem
 总之 znode 有四种类型: 持久的 (persistent), 临时的 (ephemeral), 持久有序的 (persistent sequential), 临时有序的 (ephemeral sequential)
 
 ##### 监视与通知
+ZooKeeper 通常以远程服务的方式被访问, 如果每次访问 znode 时, 客户端都需要获得节点中的内容, 这样会导致较高的延迟, 而且 ZooKeeper 需要更多的操作; 考虑以下的例子
