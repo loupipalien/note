@@ -29,4 +29,14 @@ tick 的时长单位为毫秒, tick 为 ZooKeeper 使用的基本时间度量单
 
 ##### 网络配置
 - globalOutstandingLimit
-ZooKeeper 中待处理请求的最大值 (zookeeper.globalOutstandingLimit); ZooKeeper 客户端提交的请求比 ZooKeeper 服务端处理请求要快很多, 服务端将会对请求进行队列化, 最终可能导致服务端的内存溢出; 
+ZooKeeper 中待处理请求的最大值 (zookeeper.globalOutstandingLimit); ZooKeeper 客户端提交的请求比 ZooKeeper 服务端处理请求要快很多, 服务端将会对请求进行队列化, 最终可能导致服务端的内存溢出; 为了防止发生这个问题, ZooKeeper 服务端中如果待处理请求达到 globalOutstandingLimit 值就会限制客户端的请求; 但 globalOutstandingLimit 值不是硬性限制, 因为每个客户端至少有一个待处理请求, 否则会导致客户端超时; 因此当达到 globalOutstandingLimit 值后, 服务端还会继续接收客户端连接中的请求, 条件是这个客户端在服务器中没有任何待处理的请求; 默认值是 1000
+- maxClientCnxns
+允许每个 IP 地址并发的 socket 连接的最大数量, ZooKeeper 通过流量控制和限制值来避免过载情况的发生; 默认值是 60
+- clientPortAddress
+限制客户端连接到指定的接收信息的地址, 默认情况下 ZooKeeper 服务器会监听在所有网络接口地址上等待客户端的连接; 有些服务器配置了多个网络接口, 其中一个用于内网通信, 另一个用于公网通信, 如果不希望在公网接口接收客户端的连接, 只需要设置 clientPortAddress 选项为内网接口的地址即可
+- minSessionTimeout
+最小会话超时时间, 单位为毫秒; 当客户端建立一个连接后就会请求一个明确的超时值, 而客户端实际获得的超时值不会低于 minSessionTimeout; 默认值为 tickTime 的两倍, 配置该值过低可能会导致错误的客户端检测故障, 配置过高则会延迟客户端故障的检测时间
+- maxSesionTimeout
+会话的最大超时时间值, 单位为毫秒; 当客户端建立一个连接后就会请求一个明确的超时值, 而客户端实际获得的超时值不会高于 maxSesionTimeout 的值; 虽然该参数不会影响系统的性能, 但却可以限制一个客户端消耗系统资源的时间, 默认值为 tickTime 的 20 倍
+
+##### 集群配置
