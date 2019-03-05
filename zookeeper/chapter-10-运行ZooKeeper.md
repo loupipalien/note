@@ -28,3 +28,5 @@ tick 的时长单位为毫秒, tick 为 ZooKeeper 使用的基本时间度量单
 持续跟踪 ZooKeeper 的操作, 并将操作记录到跟踪文件中, 跟踪文件名为 traceFile.year.month.day; 除非设置了该选项 (requestTraceFile), 否则跟踪功能将不会被启用; 确保不要将跟踪日志文件写到日志文件的存储设备中, 因为会争用磁盘的 IO
 
 ##### 网络配置
+- globalOutstandingLimit
+ZooKeeper 中待处理请求的最大值 (zookeeper.globalOutstandingLimit); ZooKeeper 客户端提交的请求比 ZooKeeper 服务端处理请求要快很多, 服务端将会对请求进行队列化, 最终可能导致服务端的内存溢出; 
