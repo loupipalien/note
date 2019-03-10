@@ -98,3 +98,60 @@ HTTP 通信协议中使用的首部字段不限于 RFC2616 中的 47 种, 还有
 
 ##### End-to-end 首部和 Hop-by-hop 首部
 HTTP 首部字段将定义成缓存代理和非缓存代理的行为, 分为两种类型
+- 端到端首部 (End-to-end Header)
+此类别中的首部会转发给请求/响应对应的最终接收目标, 且必须保存在由缓存生成的响应中, 另外规定它必须被转发
+- 逐跳首部 (Hop-by-hop Header)
+此类别中的首部只对单次转发有效, 会因通过缓存或代理而不再转发; HTTP/1.1 及以后版本如需使用 Hop-by-hop 首部则需提供 Connection 首部字段
+
+除了以下 8 个逐跳首部字段, 其余所有字段都属于端到端首部
+- Connection
+- Keep-alive
+- Proxy-Authenticate
+- Proxy-Authorization
+- Trailer
+- TE
+- Transfer-Encoding
+- Upgrade
+
+#### HTTP/1.1 通用首部字段
+通用首部字段指请求和响应报文都会使用的首部
+
+##### Cache-Control
+通过指定首部字段 Cache-Control 的指令, 就能操作缓存的工作机制; 指令的参数是可选的, 多个指令参数之间通过逗号分隔
+```
+Cache-Control: private, max-age = 0, no-cache
+```
+###### Cache-Control 指令一览
+- 缓存请求指令
+
+| 指令 | 参数 | 说明 |
+| :--- | :--- | :--- |
+| no-cache | 无 | 强制向源服务器再次验证 |
+| no-store | 无 | 不缓存请求或响应的任何内容 |
+| max-age = [秒] | 必需 | 响应的最大 Age 值 |
+| max-stale = ([秒]) | 可省略 | 接收已过期的响应 |
+| min-fresh = [秒] | 必需 | 期望在指定时间内的响应仍有效 |
+| no-transform | 无 | 代理不可更改媒体类型 |
+| only-if-cached | 无 | 从缓存获取资源 |
+| cach-extension | - | 新指令标记 (token) |
+
+- 缓存响应指令
+
+| 指令 | 参数 | 说明 |
+| :--- | :--- | :--- |
+| public | 无 | 可向任意方提供响应的缓存 |
+| private  | 可省略 | 仅向特定用户返回响应 |
+| no-cache | 无 | 强制向源服务器再次验证 |
+| no-store | 无 | 不缓存请求或响应的任何内容 |
+| no-transform | 无 | 代理不可更改媒体类型 |
+| must-revalidate | 无 | 可缓存但必须再向服务器进行确认 |
+| proxy-revalidae | 无 | 要求中间缓存服务器对缓存的响应有效性在进行确认 |
+| max-age = [秒] | 必需 | 响应的最大 Age 值 |
+| s-maxage = [秒] | 必需 | 公共缓存服务器响应的最大 Age 值 |
+| cach-extension | - | 新指令标记 (token) |
+
+- 表示是否能缓存的指令
+```
+Cache-Control: public
+```
+当指定为 public 时, 则表明其他用户也可利用缓存; 指定为 private 指令时, 响应只以特定的用户作为对象; 
