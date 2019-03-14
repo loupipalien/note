@@ -52,15 +52,14 @@ Web 层由 `spring-web`, `spring-webmvc`, `spring-websocket`, `spring-webmvc-por
 `spring-test` 模块提供了 [单元测试](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/unit-testing.html) 以及与 JUnit 或 TestNG 的 Spring 组件的 [整合测试](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/integration-testing.html); 它提供了 Spring ApplicationContexts 的一致性加载和这些上下文的缓存; 它还提供了你可用于独立测试你的代码的模拟对象
 
 #### 使用场景
-前面描述的构建块使 Spring 成为许多场景中的合理选择, 从在资源受限设备上运行的嵌入式应用程序到使用 Spring 的事务管理功能和 Web 框架集成的成熟企业应用程序
-![Typical full-fledged Spring web application](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-full.png)
-Spring 的 [声明式事务管理功能](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/transaction.html#transaction-declarative) 使 Web 应用程序完全是事务性的, 就像使用 EJB 容器管理的事务一样; 你可以使用简单的 POJO 实现所有自定义业务逻辑, 并由 Spring 的 IoC 容器管理; 其他服务包括对发送邮件和校验的支持是独立于 Web 层的, 这使得你可以选择执行校验规则的位置; Spring 的 ORM 支持与 JPA, Hibernate, JDO 集成在一起; 例如, 在使用 Hibernate 时, 你可以继续使用现有的映射文件和标准的 Hibernate `SessionFactory` 配置; 表单控制器将 Web 层与域模型无缝集成, 无需 ActionForms 或其他将 HTTP 参数转换为域模型值的类
-![Spring middle-tier using a third-party web framework](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-thirdparty-web.png)
-509/5000
-有时情况不允许你完全切换到不同的框架; Spring Framework 不会强迫你使用其中的所有内容; 它不是一个全有或全无的解决方案; 使用 Struts, Tapestry, JSF 或其他 UI 框架构建的现有前端可以与基于 Spring 的中间层集成, 从而允许你使用 Spring 事务功能; 你只需使用 ApplicationContext 连接业务逻辑, 并使用 WebApplicationContext 集成 Web 层
-![Remoting usage scenario](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-remoting.png)
-当你需要通过 Web 服务访问现有代码时, 可以使用 Spring 的 `Hessian-`, `Burlap-`, `Rmi-` 或 `JaxRpcProxyFactory` 类; 启用对现有应用程序的远程访问并不困难
-![EJBs - Wrapping existing POJOs](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-ejb.png)
+前面描述的构建块使 Spring 成为许多场景中的合理选择, 从在资源受限设备上运行的嵌入式应用程序到使用 Spring 的事务管理功能和 Web 框架集成的成熟企业应用程序  
+![Typical full-fledged Spring web application](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-full.png)  
+Spring 的 [声明式事务管理功能](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/transaction.html#transaction-declarative) 使 Web 应用程序完全是事务性的, 就像使用 EJB 容器管理的事务一样; 你可以使用简单的 POJO 实现所有自定义业务逻辑, 并由 Spring 的 IoC 容器管理; 其他服务包括对发送邮件和校验的支持是独立于 Web 层的, 这使得你可以选择执行校验规则的位置; Spring 的 ORM 支持与 JPA, Hibernate, JDO 集成在一起; 例如, 在使用 Hibernate 时, 你可以继续使用现有的映射文件和标准的 Hibernate `SessionFactory` 配置; 表单控制器将 Web 层与域模型无缝集成, 无需 ActionForms 或其他将 HTTP 参数转换为域模型值的类    
+![Spring middle-tier using a third-party web framework](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-thirdparty-web.png)  
+有时情况不允许你完全切换到不同的框架; Spring Framework 不会强迫你使用其中的所有内容; 它不是一个全有或全无的解决方案; 使用 Struts, Tapestry, JSF 或其他 UI 框架构建的现有前端可以与基于 Spring 的中间层集成, 从而允许你使用 Spring 事务功能; 你只需使用 ApplicationContext 连接业务逻辑, 并使用 WebApplicationContext 集成 Web 层  
+![Remoting usage scenario](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-remoting.png)  
+当你需要通过 Web 服务访问现有代码时, 可以使用 Spring 的 `Hessian-`, `Burlap-`, `Rmi-` 或 `JaxRpcProxyFactory` 类; 启用对现有应用程序的远程访问并不困难  
+![EJBs - Wrapping existing POJOs](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/overview-ejb.png)  
 Spring Framework 还为 Enterprise JavaBeans 提供了一个访问和抽象层, 使你能够重用现有的 POJO 并将它们包装在无状态会话 Bean 中, 以便在可能需要声明性安全性的, 可伸缩的, 故障安全 Web 应用程序中使用
 
 ##### 依赖管理和命名规约
@@ -216,4 +215,4 @@ dependencies {
 
 ##### 日志记录
 对于 Spring 日志记录是非常重要的依赖; a) 它是唯一的强制性外部依赖, b) 每个人都想看见他们使用的工具的一些输出, c) Spring 集成了许多其他工具, 所有这些工具都可以选择日志记录依赖; 应用程序开发者的目标之一是对于整个应用程序在一个集中位置统一日志记录配置, 包括所有的外部组件; 这可能比以往更难, 因为现在有如此多的日志记录框架选择  
-在 Spring 中强制的日志记录依赖
+在 Spring 中强制的日志记录依赖是 Jakarta Commons Logging API (JCL);
