@@ -215,4 +215,161 @@ dependencies {
 
 ##### 日志记录
 对于 Spring 日志记录是非常重要的依赖; a) 它是唯一的强制性外部依赖, b) 每个人都想看见他们使用的工具的一些输出, c) Spring 集成了许多其他工具, 所有这些工具都可以选择日志记录依赖; 应用程序开发者的目标之一是对于整个应用程序在一个集中位置统一日志记录配置, 包括所有的外部组件; 这可能比以往更难, 因为现在有如此多的日志记录框架选择  
-在 Spring 中强制的日志记录依赖是 Jakarta Commons Logging API (JCL);
+在 Spring 中强制的日志记录依赖是 Jakarta Commons Logging API (JCL); 我们针对 JCL 进行编译, 并且我们还使 JCL 的 `Log`对象对于扩展 Spring Framework 的类是可见的; 对于用户来说, 所有版本的 Spring 都使用相同的日志库是很重要的: 因为保留了向后兼容性这使得迁移很容易, 即使基于 Spring 扩展的应用程序; 我们实现此的方法是让 Spring 中的一个模块明确依赖于 commons-logging (JCL的规范实现), 然后让所有其他模块在编译时依赖于此模块; 例如, 如果您正在使用Maven, 并想知道在哪里获得了对 commons-logging 的依赖, 它是来自Spring, 来自名为 `spring-core` 的核心模块  
+567/5000
+commons-logging 的好处是你不需要依赖任何其他东西来使你的应用程序工作; 它有一个运行时发现算法, 可以在众所周知的类路径上的位置查找其他日志框架, 并使用它认为合适的一个 (或者如果需要, 可以告诉它哪一个); 如果没有其他可用的, 你可以从 JDK (java.util.logging 或简称 JUL) 获得可读的日志; 在大多数情况下, 你应该会发现 Spring 应用程序可以正常工作并开箱即用输出日志到控制台, 这是非常重要
+
+###### 使用 Log4j 1.2 或者 2.x
+>Log4j 1.2 已经不再更新; 此外, Log4j 2.3 是最新的 Java 6 兼容版本, 较新的 Log4j 2.x 版本需要 Java 7+
+
+许多人使用 [Log4j](https://logging.apache.org/log4j) 日志框架来配置和管理; 它是高效且完善的, 事实上当我们在构建 Spring 时在运行时使用它; Spring 还提供了一些用于配置和初始化 Log4j 的工具, 因此在某些模块编译时对 Log4j 具有可选的依赖性  
+为了是 Log4j 与默认的 JCL 依赖 (`commons-logging`) 一起工作, 你需要做的就是将 Log4j 放在类路径下, 并且提供一个配置文件 (在类路径的根目录下的 `log4j.properties` 或 `log4j.xml`); 因此对于 Maven 用户来说, 这是你的依赖声明:
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>4.3.20.RELEASE</version>
+    </dependency>
+    <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>1.2.17</version>
+    </dependency>
+</dependencies>
+```
+这是一个用于打印到控制台的 `log4j.properties` 的样例
+```
+log4j.rootCategory=INFO, stdout
+
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%d{ABSOLUTE} %5p %t %c{2}:%L - %m%n
+
+log4j.category.org.springframework.beans.factory=DEBUG
+```
+为了使 Log4j 2.x 与 JCL 一起工作, 你需要做的是将 Log4j 放在类路径下, 并且提供一个配置文件 (`log4j2.xml` 或 `log4j2.properties`, 或者其他 [支持的配置格式](https://logging.apache.org/log4j/2.x/manual/configuration.html)); 对于 Maven 用户来说, 以下是需要的最小依赖
+```
+<dependencies>
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.6.2</version>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-jcl</artifactId>
+        <version>2.6.2</version>
+    </dependency>
+</dependencies>
+```
+如果你希望开启 SLS4J 代理到 Log4j, 例如多于其他默认使用  SLF4J 的库, 以下依赖也是需要的
+```
+<dependencies>
+  <dependency>
+    <groupId>org.apache.logging.log4j</groupId>
+    <artifactId>log4j-slf4j-impl</artifactId>
+    <version>2.6.2</version>
+  </dependency>
+</dependencies>
+```
+这是一个用于打印到控制台的 `log4j2.xml` 的样例
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Logger name="org.springframework.beans.factory" level="DEBUG"/>
+    <Root level="error">
+      <AppenderRef ref="Console"/>
+    </Root>
+  </Loggers>
+</Configuration>
+```
+遗憾的是, 标准的 commons-logging API 中的运行时发现算法虽然对最终用户来说很方便, 但却存在问题; 如果你想避免使用 JCL 的标准查找, 通常有两种方法可以将其关闭:
+- 从 `spring-core` 模块中排除依赖 (因为它是唯一明确依赖于 `commons-logging` 的模块)
+- 依赖于一个特殊的 `commons-logging` 依赖, 此依赖使用一个空的 jar 替换库 (更多细节见 [ SLF4J FAQ](http://slf4j.org/faq.html#excludingJCL))
+
+为了排除 `commons-logging`, 添加以下到你的 `dependencyManagement` 标签中
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>4.3.20.RELEASE</version>
+        <exclusions>
+            <exclusion>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+</dependencies>
+```
+现在这个应用程序是崩溃的, 因为类路径上没有 JCL API 的实现, 所以要修复它必须提供一个新的; 在下一节中, 我们将向你展示如何使用 SLF4J 提供 JCL 的替代实现
+
+###### 使用 SLF4J 和 Log4j 或 Logback
+Simple Logging Facade for Java ([SLF4J](http://www.slf4j.org/))是一种常用的 API, 供其他库使用, 也常用于 Spring; 它通常与 Logback 一起使用, 后者是 SLF4J API 的原生实现  
+SLF4J 提供了对许多常见日志框架 (包括Log4j) 的绑定, 反过来: 其他日志框架与其自身之间的桥梁; 因此要在 Spring 中使用 SLF4J, 你需要使用 SLF4J-JCL 桥接替换 commons-logging 依赖项; 完成后, 从 Spring 中日志记录调用将转换为对 SLF4J API 的日志记录调用, 因此如果应用程序中的其他库使用该 API, 那么你只需一个地方来配置和管理日志记录  
+一个常见的选择可能是将 Spring 桥接到 SLF4J, 然后提供从 SLF4J 到 Log4j 的显式绑定; 你需要提供多个依赖项 (并排除现有的 commons-logging): JCL 桥接, 与 Log4j 绑定的 SLF4j 以及 Log4j 提供程序本身; 在Maven, 你可以这样做
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>4.3.20.RELEASE</version>
+        <exclusions>
+            <exclusion>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>1.7.21</version>
+    </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-log4j12</artifactId>
+        <version>1.7.21</version>
+    </dependency>
+    <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>1.2.17</version>
+    </dependency>
+</dependencies>
+```
+SLF4J 用户中使用较少步骤并生成较少依赖关系的更常见选择是直接绑定到 [Logback](http://logback.qos.ch/); 这删除了额外的绑定步骤, 因为 Logback 直接实现了 SLF4J, 所以你只需要依赖两个库, 即 `jcl-over-slf4j` 和 `logback` )：
+```
+<dependencies>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>1.7.21</version>
+    </dependency>
+    <dependency>
+        <groupId>ch.qos.logback</groupId>
+        <artifactId>logback-classic</artifactId>
+        <version>1.1.7</version>
+    </dependency>
+</dependencies>
+```
+
+###### 使用 JUL (java.util.logging)
+默认情况下, Commons Logging 将委托给 `java.util.logging`, 前提是在类路径中没有检测到 Log4j; 所以没有特殊的依赖设置: 在没有外部依赖关系的情况下使用 Spring 会将日志输出到 `java.util.logging`, 无论是在独立应用程序中 (在 JDK 级别使用自定义或默认 JUL 设置) 还是使用应用程序服务器的日志系统 (及其系统范围的 JUL 设置)
+
+###### 在 WebSphere 中的 Commons Logging
+Spring 应用程序可能在一个提供JCL的实现容器上运行, 例如 IBM的 WebSphere Application Server (WAS); 这本身不会导致问题, 但会导致两种不同情况, 需要理解它:  
+在 "父优先" ClassLoader 委托模型 (WAS上的默认模式)中, 应用程序将始终获取服务器提供的 Commons Logging 版本, 委托给 WAS 日志记录子系统 (实际上是基于JUL); 应用程序提供的 JCL 变体, 无论是标准的 Commons Logging 还是 JCL-over-SLF4J 桥接都将被忽略, 以及任何本地包含的日志提供程序  
+使用 "父最后" 委托模型 (常规 Servlet 容器中的默认值, WAS 上的显式配置选项), 将选择应用程序提供的 Commons Logging 变体, 使你能够设置本地包含的日志提供程序, 例如在你的应用程序中 Log4j 或 Logback; 如果没有本地日志提供程序, 则默认情况下常规 Commons Logging 将委派给 JUL, 有效地记录到 WebSphere 的日志记录子系统, 就像在 "父优先" 方案中一样  
+总而言之, 我们建议在 "父最后" 模型中部署 Spring 应用程序, 因为它自然允许本地提供程序以及服务器的日志子系统
+
+>**参考:**
+[Introduction to the Spring Framework](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/overview.html#overview-usagescenarios)
