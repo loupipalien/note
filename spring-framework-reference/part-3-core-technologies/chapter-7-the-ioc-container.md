@@ -573,3 +573,72 @@ public class ExampleBean {
     }
 }
 ```
+静态工厂方法的参数通过 `<constructor-arg/>` 元素提供, 与使用的构造器完全相同; 工厂方法返回的类的类型不必与包含静态工厂方法的类具有相同的类型, 尽管在此示例中它是这样; 实例 (非静态) 工厂方法将以基本相同的方式使用 (除了使用 factory-bean 属性而不是 `class` 属性) 因此这里不再讨论细节。
+
+##### 依赖与配置的细节
+如上一节所述, 你可以将 bean 属性和构造器参数定义为对其他托管 bean (协作者) 的引用, 或者作为内联定义的值; 为此, Spring 基于 XML 的配置元数据支持其 `<property/>` 和 `<constructor-arg/>` 元素中的子元素类型
+
+###### 字面值 (原生类, String 类等等)
+`<property/>` 元素的 `value` 将属性或构造器参数指定为人类可读的字符串表示形式; Spring 的 [转换服务](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/validation.html#core-convert-ConversionService-API) 用于将这些值从 String 转换为属性或参数的实际类型
+```
+<bean id="myDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+    <!-- results in a setDriverClassName(String) call -->
+    <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+    <property name="url" value="jdbc:mysql://localhost:3306/mydb"/>
+    <property name="username" value="root"/>
+    <property name="password" value="masterkaoli"/>
+</bean>
+```
+为了更简洁的 XML 胚子以下示例使用了 [p-namespace](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/beans.html#beans-p-namespace)
+```
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="myDataSource" class="org.apache.commons.dbcp.BasicDataSource"
+        destroy-method="close"
+        p:driverClassName="com.mysql.jdbc.Driver"
+        p:url="jdbc:mysql://localhost:3306/mydb"
+        p:username="root"
+        p:password="masterkaoli"/>
+
+</beans>
+```
+前面的 XML 更简洁; 然而拼写错误会在运行时而不是设计时发现, 除非你在创建 bean 定义时使用支持自动属性完成的 IDEA 或 STS 等 IDE, 强烈建议使用此类 IDE 帮助  
+你也可以如下配置一个 `java.util.Properties` 实例
+```
+<bean id="mappings"
+    class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+
+    <!-- typed as a java.util.Properties -->
+    <property name="properties">
+        <value>
+            jdbc.driver.className=com.mysql.jdbc.Driver
+            jdbc.url=jdbc:mysql://localhost:3306/mydb
+        </value>
+    </property>
+</bean>
+```
+Spring 容器通过使用 JavaBeans 的 `PropertyEditor` 机制将 `<value/>` 元素内的文本转换为 `java.util.Properties` 实例; 这是一个很好的快捷方式, 并且是 Spring 团队支持在值属性样式上使用嵌套 `<value/>` 元素的地方之一
+
+##### idref 元素
+`idref` 元素只是一种防错方法, 可以将容器中另一个 bean 的 id (字符串值 - 而不是引用) 传递给 `<constructor-arg/>` 或 `<property/>` 元素
+```
+<bean id="theTargetBean" class="..."/>
+
+<bean id="theClientBean" class="...">
+    <property name="targetName">
+        <idref bean="theTargetBean"/>
+    </property>
+</bean>
+```
+以上 bean 定义的片段与以下片段 (在运行时) 相等
+```
+<bean id="theTargetBean" class="..." />
+
+<bean id="client" class="...">
+    <property name="targetName" value="theTargetBean"/>
+</bean>
+```
