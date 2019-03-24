@@ -111,3 +111,6 @@ Hello World!
 
 #### 从早期的 Spring Boot 版本升级
 TODO
+
+>**参考:**
+[Installing Spring Boot](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#getting-started-installing-spring-boot)
