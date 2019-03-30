@@ -59,3 +59,112 @@ spring.devtools.restart.log-condition-evaluation-delta=false
 ```
 
 ##### 排除资源
+某些资源在更改时不一定需要触发重启; 例如, 可以就地编辑 Thymeleaf 模板; 默认情况下, 更改 `/META-INF/maven`, `/META-INF/resources`, `/resources`, `/static/ public` 或 `/templates` 中的资源不会触发重新启动, 但会触发 [实重新加载](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#using-boot-devtools-livereload); 如果要自定义这些排除项, 可以使用 `spring.devtools.restart.exclude` 属性; 例如, 仅排除 `/static` 和 `/public`, 你需要设置以下属性
+```
+spring.devtools.restart.exclude=static/**,public/**
+```
+>如果要保留这些默认值并添加其他排除项, 请使用 `spring.devtools.restart.additional-exclude` 属性
+
+##### 监控其他路径
+当你对不在类路径中的文件进行更改时, 你可能希望重新启动或重新加载应用程序; 为此, 请使用 `spring.devtools.restart.additional-paths` 属性配置其他路径以监视更改; 你可以使用前面描述的 `spring.devtools.restart.exclude` 属性来控制其他路径下的更改是触发完全重新启动还是 [实重新加载](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#using-boot-devtools-livereload)
+
+##### 禁止重启
+如果你不想使用重新启动功能, 可以使用 `spring.devtools.restart.enabled` 属性将其禁用; 在大多数情况下, 你可以在 `application.properties` 中设置此属性 (这样做仍会初始化重新启动的类加载器, 因为它不会监视文件更改)  
+如果需要完全禁用重新启动支持 (例如, 因为它不能与特定库一起使用), 则需要在调用 `SpringApplication.run(..)` 之前将 `spring.devtools.restart.enabled` 属性在 `System` 中设置为 `false`, 如下所示:
+```
+public static void main(String[] args) {
+	System.setProperty("spring.devtools.restart.enabled", "false");
+	SpringApplication.run(MyApp.class, args);
+}
+```
+
+##### 使用触发器文件
+如果使用 IDE 不断编译已更改文件的, 则可能更喜欢仅在特定时间触发重新启动; 为此, 你可以使用 "触发器文件", 这是一个特殊文件, 当你想要实际触发重新启动检查时, 必须对其进行修改; 更改文件只会触发检查, 只有在 Devtools 检测到执行了某些操作时才会重新启动; 触发器文件可以手动更新, 也可以使用 IDE 插件更新  
+要使用触发器文件, 请将 `spring.devtools.restart.trigger-file` 属性设置为触发器文件的路径
+>你可能希望将 `spring.devtools.restart.trigger-file`设置为全局配置, 以便所有项目有相同的行为方式
+
+##### 自定义重启类加载器
+如前面在 [Restart vs Reload](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#using-spring-boot-restart-vs-reload) 章节所述, 使用两个类加载器实现了重启功能; 对于大多数应用程序, 这种方法很有效; 但是, 它有时会导致类加载问题  
+默认情况下, IDE 中的任何打开项目都使用 "restart" 类加载器加载, 并且任何常规 `.jar` 文件都使用 "base" 类加载器加载; 如果是多模块项目, 并且不是每个模块都导入到 IDE 中, 则可能需要自定义内容; 为此, 你可以创建 `META-INF/spring-devtools.properties` 文件  
+`spring-devtools.properties` 文件可以包含以 `restart.exclude` 和 `restart.include` 为前缀的属性; `include` 元素是被提取到 "restart" 类加载器中的项, 而 `exclude` 元素是被下推到 "base" 类加载器中的项; 属性的值是应用于类路径的正则表达式, 如以下所示
+```
+restart.exclude.companycommonlibs=/mycorp-common-[\\w-]+\.jar
+restart.include.projectcommon=/mycorp-myproj-[\\w-]+\.jar
+```
+>所有属性键必须是唯一的, 只要属性以 `restart.include` 或者 `restart.exclude` 开头
+>类路径中的所有 `META-INF/spring-devtools.properties` 都会被加载; 你可以将文件打包到项目中, 或者打包在项目使用的库中
+
+##### 已知限制
+对于使用标准的 `ObjectInputStream` 反序列化的对象, 重新启动功能会不起作用; 如果需要反序列化数据, 可能需要将 Spring 的 `ConfigurableObjectInputStream` 与 `Thread.currentThread().getContextClassLoader()` 结合使用
+不幸的是, 一些第三方库反序列化没有考虑上下文类加载器; 如果你发现此类问题，则需要向原作者请求修复
+
+##### 重新加载
+`spring-boot-devtools` 模块包含一个内嵌的 LiveReload 服务器, 可用于在更改资源时触发浏览器刷新; LiveReload 浏览器扩展程序可从 [livereload.com](http://livereload.com/extensions/) 免费获取, 支持 Chrome, Firefox, Safari  
+如果你不想在应用程序运行时启动 LiveReload 服务器, 则可以将 `spring.devtools.livereload.enabled` 属性设置为 `false`
+>你一次只能运行一个 LiveReload 服务器; 在启动应用程序之前, 请确保没有其他 LiveReload 服务器在运行; 如果从 IDE 启动多个应用程序, 则只有第一个具有 LiveReload 支持
+
+#### 全局设置
+你可以通过将名为 `.spring-boot-devtools.properties` 的文件添加到 `$HOME` 文件夹来配置全局 devtools 设置 (请注意, 文件名以 "." 开头); 添加到此文件的任何属性都适用于计算机上使用 devtools 的所有 Spring Boot 应用程序; 例如, 要将 `restart` 配置总是使用 [触发器文件](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#using-boot-devtools-restart-triggerfile), 你可以添加以下属性到 `~/.spring-boot-devtools.properties` 文件中
+```
+spring.devtools.reload.trigger-file=.reloadtrigger
+```
+>在 `.spring-boot-devtools.properties` 中激活的配置文件不会影响特定于配置文件的加载
+
+#### 远程应用程序
+Spring Boot 开发者工具不仅限于本地开发; 远程运行应用程序时, 你也可以使用一些功能; 远程支持是可选的, 要启用它, 你需要确保 devtools 包含在 repackage 的包中, 如下所示
+```
+<build>
+	<plugins>
+		<plugin>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-maven-plugin</artifactId>
+			<configuration>
+				<excludeDevtools>false</excludeDevtools>
+			</configuration>
+		</plugin>
+	</plugins>
+</build>
+```
+然后你需要设置 `spring.devtools.remote.secret` 属性, 如以下所示
+```
+spring.devtools.remote.secret=mysecret
+```
+>在远程应用程序上启用 `spring-boot-devtools` 存在安全风险; 你永远不应该在生产环境启用该支持
+
+远程 devtools 支持分为两部分: 接收连接的服务器端端和在 IDE 中运行的客户端应用程序; 设置 `spring.devtools.remote.secret` 属性时, 将自动启用服务器组件; 客户端组件则必须手动启动
+
+##### 运行远程客户端应用程序
+远程客户端应用程序被设计为在从 IDE 中运行; 你需要运行 `org.springframework.boot.devtools.RemoteSpringApplication`, 其类路径与你连接的远程项目相同; 应用程序必需的一个参数是它所连接的远程 URL  
+例如, 如果你使用的是 Eclipse 或 STS, 并且已部署名为 `my-app` 项目到Cloud Foundry, 那么你应执行以下操作
+- 从 `Run` 菜单中选择 `Run Configurations…​`
+- 创建一个新的 `Java Application` 发布配置
+- 浏览 `my-app` 项目
+- 使用 `org.springframework.boot.devtools.RemoteSpringApplication` 作为主类
+- 添加 `https://myapp.cfapps.io` 到程序参数 (无论你的远程 URL 是什么)
+
+正在运行的远程客户端可能类似于以下输出
+```
+.   ____          _                                              __ _ _
+/\\ / ___'_ __ _ _(_)_ __  __ _          ___               _      \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` |        | _ \___ _ __  ___| |_ ___ \ \ \ \
+\\/  ___)| |_)| | | | | || (_| []::::::[]   / -_) '  \/ _ \  _/ -_) ) ) ) )
+'  |____| .__|_| |_|_| |_\__, |        |_|_\___|_|_|_\___/\__\___|/ / / /
+=========|_|==============|___/===================================/_/_/_/
+:: Spring Boot Remote :: 2.1.3.RELEASE
+
+2015-06-10 18:25:06.632  INFO 14938 --- [           main] o.s.b.devtools.RemoteSpringApplication   : Starting RemoteSpringApplication on pwmbp with PID 14938 (/Users/pwebb/projects/spring-boot/code/spring-boot-devtools/target/classes started by pwebb in /Users/pwebb/projects/spring-boot/code/spring-boot-samples/spring-boot-sample-devtools)
+2015-06-10 18:25:06.671  INFO 14938 --- [           main] s.c.a.AnnotationConfigApplicationContext : Refreshing org.springframework.context.annotation.AnnotationConfigApplicationContext@2a17b7b6: startup date [Wed Jun 10 18:25:06 PDT 2015]; root of context hierarchy
+2015-06-10 18:25:07.043  WARN 14938 --- [           main] o.s.b.d.r.c.RemoteClientConfiguration    : The connection to http://localhost:8080 is insecure. You should use a URL starting with 'https://'.
+2015-06-10 18:25:07.074  INFO 14938 --- [           main] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2015-06-10 18:25:07.130  INFO 14938 --- [           main] o.s.b.devtools.RemoteSpringApplication   : Started RemoteSpringApplication in 0.74 seconds (JVM running for 1.105)
+```
+>因为远程客户端使用与真实应用程序相同的类路径, 所以它可以直接读取应用程序属性; 这也是如何读取 `spring.devtools.remote.secret` 属性并将其传递给服务器进行身份验证的方法
+>始终建议使用 `https://` 作为连接协议, 以便加密流量避免被截获密码
+>如果需要使用代理来访问远程应用程序, 请配置 `spring.devtools.remote.proxy.host` 和 `spring.devtools.remote.proxy.port` 属性
+
+##### 远程更新
+远程客户端以本地重新启动相同的方式监视应用程序类路径的更改; 任何更新的资源都会被推送到远程应用程序, 并且 (如果需要) 会触发重新启动; 如果你迭代使用本地没有的云服务的功能, 这将非常有用; 通常, 远程更新和重新启动比全部构建和再部署快得多
+>仅在远程客户端运行时监视文件; 如果在启动远程客户端之前更改文件, 则不会将其推送到远程服务器
+
+>**参考:**
+[Developer Tools](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#using-boot-devtools)
