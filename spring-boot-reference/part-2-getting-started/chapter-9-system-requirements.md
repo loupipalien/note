@@ -1,5 +1,5 @@
 ### 系统要求
-Spring Boot 2.1.3 RELEASE 要求 [Java 8](https://www.java.com/) 并且兼容到 Java 11 (包含); 要求 [Spring 框架 5.1.5.RELEASE](https://docs.spring.io/spring/docs/5.1.5.RELEASE/spring-framework-reference/) 及以上  
+Spring Boot 2.1.3 RELEASE 要求 [Java 8](https://www.java.com/) 并且兼容到 Java 11 (包含); 要求 [Spring Framework 5.1.5.RELEASE](https://docs.spring.io/spring/docs/5.1.5.RELEASE/spring-framework-reference/) 及以上  
 为以下构建工具提供明确的支持
 
 | 构建工具 | 版本 |

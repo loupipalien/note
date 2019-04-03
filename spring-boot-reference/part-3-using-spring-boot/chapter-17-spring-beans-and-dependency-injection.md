@@ -1,5 +1,5 @@
 ### Spring Beans 和依赖注入
-你可以自由地使用任何标准的 Spring 框架技术来定义 bean 及其注入的依赖; 为简单起见, 我们经常发现使用 `@ComponentScan`(找到你的 bean) 并使用 `@Autowired` (做构造函数注入) 效果很好  
+你可以自由地使用任何标准的 Spring Framework 技术来定义 bean 及其注入的依赖; 为简单起见, 我们经常发现使用 `@ComponentScan`(找到你的 bean) 并使用 `@Autowired` (做构造函数注入) 效果很好  
 如果按照上面的建议构建代码 (在根包中定位应用程序类), 则可以添加不带任何参数的 `@ComponentScan`; 所有应用程序组件 (`@Component`, `@Service`, `@Repository`, `@Controller` 等) 都会自动注册为 Spring Beans  
 以下示例展示了一个 `@Service` Bean, 它使用构造函数注入来获取所需的 `RiskAssessor` bean
 ```

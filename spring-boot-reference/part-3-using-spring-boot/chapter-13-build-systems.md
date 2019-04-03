@@ -120,7 +120,7 @@ TODO
 | spring-boot-starter-aop | 使用 Spring AOP 和 AspectJ 进行切面编程的启动器 |
 | spring-boot-starter-artemis | 使用  Apache Artemis 进行 JMS 消息传递的启动器 |
 | spring-boot-starter-batch | 使用 Spring Batch 的启动器 |
-| spring-boot-starter-cache | 使用 Spring 框架支持缓存的启动器 |
+| spring-boot-starter-cache | 使用 Spring Framework 支持缓存的启动器 |
 | spring-boot-starter-cloud-connectors | 使用 Spring Cloud Connectors 的启动器, 简化了 Cloud Foundry 和 Heroku 等云平台的服务连接 |
 | spring-boot-starter-data-cassandra | 使用 Cassandra 分布式数据库和 Spring Data Cassandra 的启动器 |
 | spring-boot-starter-data-cassandra-reactive | 使用 Cassandra 分布式数据库和 Spring Data Cassandra Reactive 的启动器 |
@@ -159,7 +159,7 @@ TODO
 | spring-boot-starter-web | 使用 Spring MVC 构建 Web (包括RESTful) 应用程序的启动器; 使用 Tomcat 作为默认嵌入式容器 |
 | spring-boot-starter-web-services | 使用 Spring Web Services 的启动器 |
 | spring-boot-starter-webflux | 使用 Spring Framework Reactive Web 支持的构建 WebFlux 应用程序的启动器 |
-| spring-boot-starter-websocket | 使用Spring Framework WebSocket 支持的构建 WebSocket 应用程序的启动器 |
+| spring-boot-starter-websocket | 使用 Spring Framework WebSocket 支持的构建 WebSocket 应用程序的启动器 |
 
 除应用程序启动器外, 还可以使用以下启动器添加 [生产级别](https://docs.spring.io/spring-boot/docs/2.1.3.RELEASE/reference/htmlsingle/#production-ready) 特性
 

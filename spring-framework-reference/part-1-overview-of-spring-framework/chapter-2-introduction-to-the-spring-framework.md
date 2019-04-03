@@ -1,5 +1,5 @@
-### Spring 框架介绍
-Spring 框架是一个为开发 Java 应用提供全面基础支持的 Java 平台; Spring 处理基础架构, 这样你可以专注你的应用程序  
+### Spring Framework介绍
+Spring Framework 是一个为开发 Java 应用提供全面基础支持的 Java 平台; Spring 处理基础架构, 这样你可以专注你的应用程序  
 Spring 使你可以从 plain old Java objects (POJOs) 构建应用程序, 并且可以无侵入的将企业服务应用于 POJOs;
 这些功能可以应用于 Java SE 编程模型以及全部或部分的 Java EE  
 作为一名应用程序开发者, 你可以从 Spring 平台收益示例如下:
@@ -11,12 +11,12 @@ Spring 使你可以从 plain old Java objects (POJOs) 构建应用程序, 并且
 #### 依赖注入和控制反转
 Java应用程序 - 从受约束的嵌入式应用程序到n层服务器端企业应用程序的宽松术语 - 通常由协作形成应用程序的对象组成; 因此, 应用程序中的对象彼此依赖  
 虽然 Java 平台提供了丰富的应用程序开发功能, 但是它缺少将基本构建块组织成连贯整体的方法, 而将这项任务留给了架构师和开发者; 虽然你可以使用例如工厂, 抽象工厂, 建造者, 装饰器, 服务定位器等设计模式组合各种类和对象实例来组成一个应用程序, 这些模式简单来说是: 给予最佳实践的一个名称, 描述这些模式的作用, 它应用的位置, 它解决的问题, 等等; 模式是在你的应用程序中你必须实现的规范化的最佳实践  
-Spring 框架控制反转 (IoC) 组件解决这个问题是通过提供一种将不同组件组合成一个完全可以使用的应用程序的规范化方法; Spring 框架将编写规范化的设计模式作为可以集成到你自己的应用程序中的头等对象; 许多组织和机构以这种方式使用 Spring 框架来构建健壮的, 可维护的应用程序
+Spring Framework 控制反转 (IoC) 组件解决这个问题是通过提供一种将不同组件组合成一个完全可以使用的应用程序的规范化方法; Spring Framework 将编写规范化的设计模式作为可以集成到你自己的应用程序中的头等对象; 许多组织和机构以这种方式使用 Spring Framework 来构建健壮的, 可维护的应用程序
 >**背景**
 "问题是, [它们] 是控制哪个方面的反转?"; 2004 年, Martin Fowler 在 [自己的网站](http://martinfowler.com/articles/injection.html) 上提出的关于控制反转的这个问题; Fowler 建议重命名这个原则使它更具有自解释性并且提出了注入依赖
 
 #### 框架模块
-Spring 框架由大约由 20 多个模块的功能组成; 这些模块分为 Core Container, Data Access/Integration, Web, AOP (Aspect Oriented Programming), Instrumentation, Messaging, and Test, 如下图所示
+Spring Framework 由大约 20 多个模块的功能组成; 这些模块分为 Core Container, Data Access/Integration, Web, AOP (Aspect Oriented Programming), Instrumentation, Messaging, and Test, 如下图所示
 ![Overview of the Spring Framework](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/images/spring-overview.png)
 以下章节列出了每个功能的可用模块及其构件名称及其涵盖的主题; 构件名称与依赖管理工具中的构建 ID 相关联
 
@@ -32,7 +32,7 @@ Spring 框架由大约由 20 多个模块的功能组成; 这些模块分为 Cor
 `spring-instrument` 模块提供了用于特定应用服务器的类工具支持和类加载器实现; `spring-instrument-tomcat` 模块包含对 Tomcat 的 Spring 工具代理
 
 ##### 消息发送
-Spring 框架 4 包括一个 `spring-messaging` 模块, 其中包含来自 Spring Integration 项目的关键抽象, 例如 `Message`, `MessageChannel`, `MessageHandler`, 以及其他为基于消息应用程序服务的基础; 此模块也包含用于映射消息到方法的一系列注解, 类似于基于编程模型的 Spring MVC 的注解
+Spring Framework 4 包括一个 `spring-messaging` 模块, 其中包含来自 Spring Integration 项目的关键抽象, 例如 `Message`, `MessageChannel`, `MessageHandler`, 以及其他为基于消息应用程序服务的基础; 此模块也包含用于映射消息到方法的一系列注解, 类似于基于编程模型的 Spring MVC 的注解
 
 ##### 数据访问/整合
 数据访问/整合层由 JDBC, ORM, JMS 和事务模块组成  
@@ -40,12 +40,12 @@ Spring 框架 4 包括一个 `spring-messaging` 模块, 其中包含来自 Sprin
 `spring-tx` 模块支持对实现特殊接口的类和你所有的 POJOs (Plain Old Java Objects) 进行 [编码和声明式事务](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/transaction.html) 管理  
 `spring-orm` 模块为流行的 [对象关系映射](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/orm.html#orm-introduction) APIs 提供了整合层, 包括 [JPA](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/orm.html#orm-jpa), [JDO](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/orm.html#orm-jdo) 和 [Hibernate](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/orm.html#orm-hibernate); 使用 `spring-orm` 模块你可以联合 Spring 提供的其他功能使用所有的 O/R-映射框架, 例如之前提到的生民式事务管理功能  
 `spring-oxm` 模块提供了支持例如 JAXB, Castor, XMLBeans, JiBX, XStream 等 [Object/XML 映射](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/oxm.html) 实现的抽象层  
-`spring-jms`模块 ([Java Messaging Service](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/jms.html)) 包含消息产生和消费的功能; 自 Spring 框架 4.1, 它提供了与 `spring-messaging` 模块的整合
+`spring-jms`模块 ([Java Messaging Service](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/jms.html)) 包含消息产生和消费的功能; 自 Spring Framework 4.1, 它提供了与 `spring-messaging` 模块的整合
 
 ##### Web
 Web 层由 `spring-web`, `spring-webmvc`, `spring-websocket`, `spring-webmvc-portlet` 模块组成  
 `spring-web` 模块提供了基础的面向 web 整合功能, 例如多部件文件上传功能和使用 Servlet 监听器和面向 web 应用的上下文初始化 IoC 容器; 它也包含一个 HTTP 客户端和 Spring 远程支持的 web 相关部分  
-`spring-webmvc` 模块 (也被称作 Web-Servlet 模块) 包含对 web 应用程序的 Spring 的模型 - 视图 - 控制器 (MVC) 和 REST Web Service 实现; Spring 的 MVC 框架在领域模型代码和 web 表单之间提供了干净的分离, 并且整合了 Spring 框架的其他功能  
+`spring-webmvc` 模块 (也被称作 Web-Servlet 模块) 包含对 web 应用程序的 Spring 的模型 - 视图 - 控制器 (MVC) 和 REST Web Service 实现; Spring 的 MVC 框架在领域模型代码和 web 表单之间提供了干净的分离, 并且整合了 Spring Framework的其他功能  
 `spring-webmvc-portlet` 模块 (也被称作 Web-Portlet 模块) 提供了在Portlet环境中使用的 MVC 实现，并镜像了基于 Servlet 的 spring-webmvc 模块的功能
 
 ##### 测试
@@ -65,7 +65,7 @@ Spring Framework 还为 Enterprise JavaBeans 提供了一个访问和抽象层, 
 ##### 依赖管理和命名规约
 依赖管理和依赖注入是不同的事; 为了在你的应用程序中基础 Spring 中的优秀功能 (如依赖注入), 你需要组装所需的库 (jar 文件) 并且将它们放在运行时的 classpath 中, 也可能是编译时; 这些依赖项不是注入的虚拟组件, 而是文件系统中的物理资源 (通常的); 依赖管理的处理设计定位这些资源, 存储它们, 并且将它们添加到 classpath 中; 依赖可以是直接的 (例如: 我的应用程序依赖 Spring), 或者是间接的 (例如: 我的应用程序依赖于依赖 `common-pool` 的 `common-dbcp`); 间接依赖也被称为传递性, 并且这些依赖也是最难识别和管理的  
 如果你打算使用 Spring, 那么你需要获取你需要的 Spring 部分的 jar 库副本; 为了使这更容易, Spring 尽可能的分离依赖打包成一系列的模块, 例如你不需要 spring-web 模块如果你不想写一个 web 应用程序; 在本指南中为了指明 Spring 库, 我们使用一个简写的命名规约 `spring-*` 或者 `spring-*.jar`, `*` 代表着模块的简短名称 (例如: `spring-core`, `spring-webmvc`, `spring-jms` 等); 你使用的实际 jar 文件名通常是与版本号连接的模块名称 (例如: spring-core-4.3.20.RELEASE.jar)  
-Spring 框架的每个发行版都会推送构件到以下地址:
+Spring Framework 的每个发行版都会推送构件到以下地址:
 - Maven 中央库, 这是 Maven 查询的默认仓库, 并且不要需要指定配置就可以使用; Spring 依赖的大多数公共库也可从 Maven 中央库获得, 并且 Spring 社区的很大一部分使用 Maven 作为依赖管理, 因为这对他们来说很方便; 这些 jars 名称形如 `spring-*-<version>.jar` 并且 Maven 的组标识是 `org.springframework`  
 - 在专门为 Spring 托管的公共 Maven 仓库中; 除了最终的 GA 发行版, 这个仓库也托管了开发快照版和里程碑版; jar 文件命名与 Maven 中央库的形式相同, 这里的一个有用之处是可以让 Spring 的开发版本与 Maven Central 中部署的其他库一起使用; 这个仓库还包含一个捆绑包分发 zip 文件, 其中包含捆绑在一起的所有 Spring jar, 以便于下载  
 
@@ -159,7 +159,7 @@ Spring 框架的每个发行版都会推送构件到以下地址:
     </dependencies>
 </dependencyManagement>
 ```
-使用 BOM 的另一个好处是当依赖于 Spring 框架的构件时你不在需要指定 `<version>` 属性
+使用 BOM 的另一个好处是当依赖于 Spring Framework的构件时你不在需要指定 `<version>` 属性
 ```
 <dependencies>
     <dependency>
@@ -209,7 +209,7 @@ dependencies {
 ```
 
 ###### 发行版 Zip 文件
-虽然使用构建系统可以支持依赖管理, 也是获取 Spring 框架的推荐方式, 但仍可以下载一个发行版 zip 文件  
+虽然使用构建系统可以支持依赖管理, 也是获取 Spring Framework 的推荐方式, 但仍可以下载一个发行版 zip 文件  
 发行版 Zips 被发布在 Spring Maven 仓库中 (这只是为了方便起见, 你不需要 Maven 或任何其他构建系统来下载它们)  
 要下载分发 zip, 打开一个 web 浏览器到 ` http://repo.spring.io/release/org/springframework/spring`, 并且选择你想要的合适的版本子目录; 发行版文件以 `-dist-zip` 结尾, 例如 spring-framework-{spring-version}-RELEASE-dist.zip; 对于 [milestones](https://repo.spring.io/milestone/org/springframework/spring) 和 [snapshots](https://repo.spring.io/snapshot/org/springframework/spring) 也有公开发行版
 
