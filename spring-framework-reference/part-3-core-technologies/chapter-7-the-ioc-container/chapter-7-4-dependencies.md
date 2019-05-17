@@ -441,3 +441,103 @@ support=support@example.co.uk
 此合并行为同样适用于 `<list/>, <map/>, <set/>` 集合类型; 在 `<list/>` 元素的特定情况下, 保持与 List 集合类型相关联的语义, 即有序的值集合的概念; 父级的值位于所有子级列表的值之前; 对于 `Map, Set, Properties` 集合类型, 不存在排序; 因此, 对于作为容器内部使用的关联 `Map, Set, Properties` 实现类型的基础的集合类型, 没有排序语义生效
 
 ##### 集合合并的限制
+你不能合并不同的集合类型 (例如 `Map` 和 `List`), 如果你尝试这样做, 则会抛出相应的 Exception; 必须在较低的继承子定义上指定 `merge` 属性; 在父集合定义上指定 `merge` 属性是多余的, 不会导致所需的合并
+
+##### 强类型集合
+在 Java 5中引入泛型类型, 你可以使用强类型集合; 也就是说, 可以声明 Collection 类型, 使其只能包含 `String` 元素; 如果你使用 Spring 依赖注入一个强类型的 Collection 到 bean 中, 你可以利用 Spring 的类型转换支持, 这样强类型 Collection 实例的元素在被添加到之前就会被转换为适当的类型集合
+```
+public class Foo {
+
+    private Map<String, Float> accounts;
+
+    public void setAccounts(Map<String, Float> accounts) {
+        this.accounts = accounts;
+    }
+}
+```
+```
+<beans>
+    <bean id="foo" class="x.y.Foo">
+        <property name="accounts">
+            <map>
+                <entry key="one" value="9.99"/>
+                <entry key="two" value="2.75"/>
+                <entry key="six" value="3.99"/>
+            </map>
+        </property>
+    </bean>
+</beans>
+```
+当 `foo` bean 的 `accounts` 属性准备好进行注入时, 可以通过反射获得有关强类型 `Map<Strin,Float>` 的元素类型的泛型信息; 因此, Spring 的类型转换基础结构将各种值元素识别为 `Float` 类型, 并将字符串值 `9.99, 2.75, 3.99` 转换为实际的 Float 类型
+
+##### Null 和空字符串值
+Spring 将属性等的空参数视为空字符; 以下基于 XML 的配置元数据片段将 email 属性设置为空 String 值 ("")
+```
+<bean class="ExampleBean">
+    <property name="email" value=""/>
+</bean>
+```
+以上示例等同于以下代码
+```
+exampleBean.setEmail("");
+```
+`<null/>` 元素处理 `null` 值, 例如
+```
+<bean class="ExampleBean">
+    <property name="email">
+        <null/>
+    </property>
+</bean>
+```
+以上示例等同于以下代码
+```
+exampleBean.setEmail(null);
+```
+
+##### 使用 p-namespace 的 XML 快捷方式
+p-namespace 使你可以使用 bean 元素的属性而不是嵌套的 `<property/>` 元素来描述属性值或者协作 bean  
+Spring 支持具有命名空间的可扩展配置格式, 这些命名空间基于 XML Schema 定义; 本章中讨论的 `bean` 配置格式在 XML Schema 文档中定义; 但是, p-namespace 未在 XSD 文件中定义, 仅存在于Spring的核心中  
+以下示例显示了两个解析为相同结果的 XML 片段: 第一个使用标准 XML 格式, 第二个使用 p-namespace
+```
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean name="classic" class="com.example.ExampleBean">
+        <property name="email" value="foo@bar.com"/>
+    </bean>
+
+    <bean name="p-namespace" class="com.example.ExampleBean"
+        p:email="foo@bar.com"/>
+</beans>
+```
+该示例显示了 bean 定义中名为 email 的 p-namespace 中的属性; 这告诉 Spring 包含一个属性声明; 如前所述, p-namespace 没有 schema 定义, 因此你可以将属性的名称设置为属性名称  
+下一个示例包括另外两个 `bean` 定义, 它们都引用了另一个 `bean`
+```
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean name="john-classic" class="com.example.Person">
+        <property name="name" value="John Doe"/>
+        <property name="spouse" ref="jane"/>
+    </bean>
+
+    <bean name="john-modern"
+        class="com.example.Person"
+        p:name="John Doe"
+        p:spouse-ref="jane"/>
+
+    <bean name="jane" class="com.example.Person">
+        <property name="name" value="Jane Doe"/>
+    </bean>
+</beans>
+```
+如你所见, 此示例不仅包含使用 p-namespace 的属性值, 还使用特殊格式来声明属性引用; 第一个 bean 定义使用 `<property name="spouse" ref="jane"/>` 来创建从 bean `john` 到 bean `jane` 的引用, 而第二个 bean 定义使用 `p:spouse-ref="jane"` 作为属性来完成相同的事情; 在这种情况下, `spouse` 是属性名称, 而 `-ref` 部分表示这不是直接值, 而是对另一个 bean 的引用
+>p-namespace 不如标准 XML 格式灵活; 例如, 声明属性引用的格式与以 `Ref` 结尾的属性冲突, 而标准 XML 格式则不然; 我们建议你仔细选择你的方法并将其传达给你的团队成员, 以避免生成同时使用这三种方法的 XML 文档
+
+##### 使用 c-namespace 的 XML 快捷方式
