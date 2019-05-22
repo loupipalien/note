@@ -4,5 +4,5 @@
 简而言之, ·`BeanFactory` 提供了配置框架和基础功能, `ApplicationContext` 添加了更多企业级的功能; `ApplicationContext` 是 `BeanFactory` 的一个完整超集, 在本章中仅用于 Spring IoC 容器的描述; 更多关于使用 `BeanFactory` 而不是 `ApplicationContext` 的信息, 参见 [7.16 小节, BeanFactory](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/beans.html#beans-beanfactory)  
 在 Spring 中, 构成你应用程序的主干的并且被 Spring Ioc 容器管理的对象称为 beans; 一个 bean 是一个被实例化的, 装备过的, 并且被 Sprign IoC 容器管理的对象, bean 是你应用程序中众多对象中的一个; Bean 及其之间的依赖关系反映在容器使用的配置元数据中
 
->**参考:**
+>**参考:**  
 [Introduction to the Spring IoC container and beans](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-introduction)

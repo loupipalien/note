@@ -161,3 +161,6 @@ context.refresh();
 ```
 这些读取器可以委托在同一个 ApplicationContext 上混合使用, 如果需要可以从不同的配置源读取 bean 定义  
 你可以使用 `getBean` 来所有你的 beans 实例; `ApplicationContext` 接口有一些其他的接口来搜索这些 beans, 但最好你的程序代码从不使用它们; 事实上, 你的程序代码应该完全不调用 `getBean()` 方法, 这样就完全不依赖于 Spring APIs; 例如, Spring 与 Web 框架的集成为各种 Web 框架组件 (如控制器和 JSF 托管 bean) 提供依赖注入, 允许你通过元数据 (例如自动装配注解) 声明对特定 bean 的依赖
+
+>**参考:**  
+[Container overview](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-basics)

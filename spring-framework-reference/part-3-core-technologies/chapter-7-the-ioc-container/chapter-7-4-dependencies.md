@@ -566,3 +566,237 @@ Spring 支持具有命名空间的可扩展配置格式, 这些命名空间基�
 </beans>
 ```
 `c:namespace` 名称空间使用与 `p:namespace` (用于 bean 引用的trailing `-ref`) 有相同的约定, 用于按名称设置构造函数参数; 同样, 它需要声明, 即使它没有在 XSD 中定义 (但它存在于 Spring Core 中)
+
+TODO
+
+##### 复合属性名称
+只要除最终属性名称之外的路径的所有组件都不为 `null`, 你可以在设置 bean 属性时使用复合或嵌套属性名称; 见以下 bean 定义
+```
+<bean id="foo" class="foo.Bar">
+    <property name="fred.bob.sammy" value="123" />
+</bean>
+```
+`foo` bean 有一个 `fred` 属性, 它有一个 `bob` 属性, 它有一个 `sammy` 属性, 最后的 `sammy` 属性被设置为值 `123`; 为了使之工作, `foo` 的 `fred` 属性和 `bob` 属性在构造 bean 之后, `fred` 不能为 `null`, 否则抛出 `NullPointerException`
+
+##### 使用 depends-on
+如果 bean 是另一个 bean 的依赖项, 通常意味着将一个 bean 设置为另一个 bean 的属性; 通常你可以使用基于 XML 的配置元数据中的 `<ref/>` 元素来完成此操作; 但有时 bean 之间的依赖关系不那么直接; 例如, 需要触发类中的静态初始化程序, 例如数据库驱动程序注册; 在初始化使用此元素的 bean 之前, depends-on 属性可以显式强制初始化一个或多个 bean; 以下示例使用 depends-on 属性表示对单个 bean 的依赖关系:
+```
+<bean id="beanOne" class="ExampleBean" depends-on="manager,accountDao">
+    <property name="manager" ref="manager" />
+</bean>
+
+<bean id="manager" class="ManagerBean" />
+<bean id="accountDao" class="x.y.jdbc.JdbcAccountDao" />
+```
+>bean 定义中的 `depends-on` 属性既可以指定初始化时间依赖关系, 也可以指定仅限单例 bean 的相应销毁时间依赖关系; 在给定的 bean 本身被销毁之前, 首先销毁定义与给定 bean 的依赖关系的从属 bean; 因此, 依赖也可以控制销毁顺序
+
+##### 延迟初始化的 beans
+默认情况下, ApplicationContext 实现会激进地创建和配置所有单例 bean, 作为初始化过程的一部分; 通常, 这种预先实例化是可取的, 因为配置或周围环境中的错误是立即发现的, 而不是几小时甚至几天后; 如果不希望出现这种情况, 可以通过将 bean 定义标记为延迟初始化来阻止单例 bean 的预实例化; 延迟初始化的 bean 告诉 IoC 容器在第一次请求时创建 bean 实例, 而不是在启动时  
+在 XML 中，此行为由 `<bean/>` 元素上的 `lazy-init`属性控制; 例如
+```
+<bean id="lazy" class="com.foo.ExpensiveToCreateBean" lazy-init="true"/>
+<bean name="not.lazy" class="com.foo.AnotherBean"/>
+```
+当 ApplicationContext 使用上述配置时, 在 ApplicationContext 启动时不会激进地预先实例化名为 `lazy` 的 bean, 然而会激进地预先实例化 `not.lazy` bean  
+但是, 当延迟初始化的 bean 是未进行延迟初始化的单例 bean 的依赖项时, ApplicationContext 会在启动时创建延迟初始化的 bean, 因为它必须满足单例的依赖关系; 延迟初始化的 bean 被注入到其他地方的单例 bean 中, 而这个 bean 并不是延迟初始化的  
+你可以使用 `<beans/>` 元素上的 `default-lazy-init` 属性控制容器级别的延迟初始化; 例如
+```
+<beans default-lazy-init="true">
+    <!-- no beans will be pre-instantiated... -->
+</beans>
+```
+
+##### 自动装配协作者
+Spring 容器可以自动连接协作 bean 之间的关系; 你可以通过检查 ApplicationContext 的内容, 允许 Spring 自动为你的 bean 解析协作者 (其他bean); 自动装配具有以下优点
+- 自动装配可以显着减少指定属性或构造函数参数的需要 (在本章其他地方讨论的其他机制, 如 bean 模板, 在这方面也很有价值)
+- 自动装配可以随着对象的发展更新配置; 例如, 如果需要向类添加依赖项, 则可以自动满足该依赖项, 而无需修改配置; 因此, 自动装配在开发期间尤其有用, 而不拒绝在代码库变得更稳定时切换到显式布线的选择
+
+使用基于 XML 的配置元数据时, 可以使用 `<bean/>` 元素的 `autowire` 属性为 bean 的定义指定 autowire 模式; 自动装配功能有四种模式, 你可以为每个 bean 都指定自动装配, 因此需选择那些自动装配的选项
+
+| 模式 | 解释     |
+| :--- | :--- |
+| no | (默认) 无自动装配; 必须通过 `ref` 元素定义 Bean 引用; 不建议对较大的部署更改默认设置, 因为明确指定协作者可以提供更好的控制和清晰度; 在某种程度上, 它记录了系统的结构 |
+| byName | 按属性名称自动装配; Spring 查找与需要自动装配的属性同名的 bean; 例如, 如果 bean 定义按名称设置为 autowire, 并且它包含 master 属性 (即它具有 setMaster(..) 方法), 则 Spring 会查找名为 master 的 bean 定义, 并使用它来设置属性 |
+| byType | 如果容器中只存在一个属性类型的 bean, 则允许自动装配属性; 如果存在多个, 则抛出异常, 这表示你不能对该 bean 使用 byType 自动装配; 如果没有匹配的 bean, 什么都不会发生, 此属性也不会被设置 |
+| constructor | 类似于 byType, 但适用于构造函数参数; 如果容器中没有构造函数参数类型的一个 bean, 则会引发错误 |
+
+使用 byType 或构造函数自动装配模式, 你可以连接数组和类型集合; 在这种情况下, 提供容器内与预期类型匹配的所有 autowire 候选者以满足依赖性; 如果预期的键类型为 `String`, 则可以自动装配强类型映射; 自动装配的 Maps 值将包含与预期类型匹配的所有 Bean 实例, 而 Maps 键将包含相应的 bean 名称  
+你可以将 autowire 行为与依赖性检查相结合, 这将在自动装配完成后执行
+###### 自动装配的局限和不足
+当在整个项目中一致地使用自动装配时效果最佳; 如果一般不使用自动装配, 那么开发人员使用它来连接一个或两个 bean 定义可能会让人感到困惑  
+考虑自动装配的局限和缺点:
+- property 和 constructor-arg 设置中的显式依赖项始终覆盖自动装配; 你无法自动装配所谓的简单属性, 例如原始类型, `String` 和 `Classes` (以及此类简单属性的数组); 这种限制是有意设计的
+- 自动装配不如显式布线精确; 尽管如上表所示, Spring 会小心避免在可能产生意外结果的歧义的情况下进行猜测, 但不再明确记录 Spring 管理对象之间的关系
+- 可能无法为可能从 Spring 容器生成文档的工具提供接线信息
+- 容器中的多个 bean 定义可以匹配 setter 方法或构造函数参数指定的类型以进行自动装配; 对于数组, 集合或地图, 这不一定是个问题; 但是, 对于期望单个值的依赖关系, 这种模糊性不是任意解决的; 如果没有可用的唯一 bean 定义, 则抛出异常。
+
+在最后的场景中, 你有以下几种选择
+- 放弃自动装配，支持显式布线
+- 通过将 `autowire-candidate` 属性设置为 `false`, 避免对 bean 定义进行自动装配, 如下一节所述
+- 通过将其 `<bean/>` 元素的 `primary` 属性设置为 `true`, 将单个 `bean` 定义指定为主要候选者
+- 使用基于注释的配置实现更细粒度的控制, 见 [第 7.9 节 "基于注释的容器配置" 中所述](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-annotation-config)
+###### 从自动装配中排除一个 bean
+TODO
+
+##### 方法注入
+在大多数应用程序场景中, 容器中的大多数 bean 都是单例; 当单例 bean 需要与另一个单例 bean 协作, 或者非单例 bean 需要与另一个非单例 bean 协作时, 通常通过将一个 bean 定义为另一个 bean 的属性来处理依赖关系; 当 bean 生命周期不同时会出现问题; 假设单例 bean A 需要使用非单例 (原型) bean B, 可能是在 A 上的每个方法调用上; 容器只创建一次单例 bean A, 因此只有一次机会来设置属性; 每次需要时, 容器都不能为 bean A 提供 bean B 的新实例  
+解决方案是放弃一些控制反转; 你可以通过实现 `ApplicationContextAware` 接口 [使 bean A 了解容器](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-factory-aware), 并通过 [对容器进行 getBean("B") 调用](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-factory-client), 每次 bean A 需要时都要求 (通常是新的) bean B 实例; 以下是此方法的示例
+```
+// a class that uses a stateful Command-style class to perform some processing
+package fiona.apple;
+
+// Spring-API imports
+import org.springframework.beans.BeansException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+
+public class CommandManager implements ApplicationContextAware {
+
+    private ApplicationContext applicationContext;
+
+    public Object process(Map commandState) {
+        // grab a new instance of the appropriate Command
+        Command command = createCommand();
+        // set the state on the (hopefully brand new) Command instance
+        command.setState(commandState);
+        return command.execute();
+    }
+
+    protected Command createCommand() {
+        // notice the Spring API dependency!
+        return this.applicationContext.getBean("command", Command.class);
+    }
+
+    public void setApplicationContext(
+            ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+    }
+}
+```
+前面的内容是不可取的, 因为业务代码知道并耦合到 Spring Framework; Method Injection 是 Spring IoC 容器的一个高级功能, 它允许以干净的方式处理这个用例  
+你可以在 [此博客](https://spring.io/blog/2004/08/06/method-injection/) 中阅读有关 Method Injection 的动机的更多信息
+###### Lookup 方法注入
+Lookup 方法注入是容器覆盖容器托管 bean 上方法的能力, 以返回容器中另一个命名 bean 的查找结果; 查找通常涉及原型 bean, 如上一节中描述的场景; Spring Framework 通过使用 CGLIB 库中的字节码生成来实现此方法注入, 以动态生成覆盖该方法的子类
+>- 为了使这个动态子类化工作, Spring bean 容器将子类化的类不能是 `final`, 并且要重写的方法也不能是 `final`
+>- 对具有抽象方法的类进行单元测试需要你自己对类进行子类化, 并提供抽象方法的存根实现
+>- 组件扫描也需要具体的方法, 这需要具体的类别来获取
+>- 另一个关键限制是查找方法不适用于工厂方法, 特别是配置类中的 `@Bean` 方法, 因为容器在这种情况下不负责创建实例, 因此无法动态的创建运行时生成的子类
+
+查看前面代码片段中的 `CommandManager`类, 你会看到 Spring 容器将动态覆盖 createCommand() 方法的实现; 你的 `CommandManager` 类将没有任何 Spring 依赖项, 如在重新编写的示例中可以看到的那样
+```
+package fiona.apple;
+
+// no more Spring imports!
+
+public abstract class CommandManager {
+
+    public Object process(Object commandState) {
+        // grab a new instance of the appropriate Command interface
+        Command command = createCommand();
+        // set the state on the (hopefully brand new) Command instance
+        command.setState(commandState);
+        return command.execute();
+    }
+
+    // okay... but where is the implementation of this method?
+    protected abstract Command createCommand();
+}
+```
+在包含要注入的方法的客户端类 (在本例中为 CommandManager)中, 要注入的方法需要以下形式的签名
+```
+<public|protected> [abstract] <return-type> theMethodName(no-arguments);
+```
+如果方法是抽象的, 则动态生成的子类实现该方法; 否则, 动态生成的子类将覆盖原始类中定义的具体方法; 例如
+```
+<!-- a stateful bean deployed as a prototype (non-singleton) -->
+<bean id="myCommand" class="fiona.apple.AsyncCommand" scope="prototype">
+    <!-- inject dependencies here as required -->
+</bean>
+
+<!-- commandProcessor uses statefulCommandHelper -->
+<bean id="commandManager" class="fiona.apple.CommandManager">
+    <lookup-method name="createCommand" bean="myCommand"/>
+</bean>
+```
+标识为 commandManager 的 bean 在需要 myCommand bean 的新实例时调用自己的方法 createCommand(); 你必须小心将 myCommand bean 部署为原型, 如果这实际上是需要的话; 如果它是一个单例, 则每次都返回 myCommand bean 的相同实例  
+可选的, 在基于注释的组件模型中, 你可以通过 `@Lookup` 注解声明查找方法
+```
+public abstract class CommandManager {
+
+    public Object process(Object commandState) {
+        Command command = createCommand();
+        command.setState(commandState);
+        return command.execute();
+    }
+
+    @Lookup("myCommand")
+    protected abstract Command createCommand();
+}
+```
+或者是更常见的形式, 你可以依赖于针对查找方法的声明返回类型来解析目标 bean
+```
+public abstract class CommandManager {
+
+    public Object process(Object commandState) {
+        MyCommand command = createCommand();
+        command.setState(commandState);
+        return command.execute();
+    }
+
+    @Lookup
+    protected abstract MyCommand createCommand();
+}
+```
+请注意,你通常会使用具体的存根实现声明这种带注释的查找方法, 以使它们与 Spring 的组件扫描规则兼容, 默认情况下抽象类被忽略; 此限制不适用于显式注册或显式导入的 bean 类
+>访问不同范围的目标 bean 的另一种方法是 ObjectFactory/Provider 注入点; 见 ["Scope bean 作为依赖" 小节](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-factory-scopes-other-injection); 感兴趣的读者也可以找到 `ServiceLocatorFactoryBean`(在 org.springframework.beans.factory.config 包中)
+
+###### 任意方法替换
+与查找方法注入相比, 一种不太有用的方法注入形式是能够使用另一个方法实现替换托管 bean 中的任意方法; 用户可以安全地跳过本节的其余部分, 直到实际需要该功能  
+使用基于 XML 的配置元数据, 你可以使用被替换的方法元素将已部署的 bean 的方法实现替换; 考虑以下类, 我们要覆盖方法 `computeValue`
+```
+public class MyValueCalculator {
+
+    public String computeValue(String input) {
+        // some real code...
+    }
+
+    // some other methods...
+}
+```
+实现 `org.springframework.beans.factory.support.MethodReplacer` 接口的类可以提供新方法定义
+```
+/**
+ * meant to be used to override the existing computeValue(String)
+ * implementation in MyValueCalculator
+ */
+public class ReplacementComputeValue implements MethodReplacer {
+
+    public Object reimplement(Object o, Method m, Object[] args) throws Throwable {
+        // get the input value, work with it, and return a computed result
+        String input = (String) args[0];
+        ...
+        return ...;
+    }
+}
+```
+部署原始类并指定方法覆盖的 bean 定义如下所示
+```
+<bean id="myValueCalculator" class="x.y.z.MyValueCalculator">
+    <!-- arbitrary method replacement -->
+    <replaced-method name="computeValue" replacer="replacementComputeValue">
+        <arg-type>String</arg-type>
+    </replaced-method>
+</bean>
+
+<bean id="replacementComputeValue" class="a.b.c.ReplacementComputeValue"/>
+```
+你可以在 `<replacement-method/>` 元素中使用一个或多个包含的 `<arg-type/>` 元素来指示被覆盖的方法的方法签名; 仅当方法重载且类中存在多个变体时才需要参数的签名; 为方便起见, 参数的类型字符串可以是完全限定类型名称的子字符串;  例如, 以下所有内容都匹配 `java.lang.String`
+```
+java.lang.String
+String
+Str
+```
+因为参数的数量通常足以区分每个可能的选择, 所以通过允许你只键入与参数类型匹配的最短字符串, 此快捷方式可以节省大量的输入
+
+>**参考:**  
+[Dependencies](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-dependencies)
