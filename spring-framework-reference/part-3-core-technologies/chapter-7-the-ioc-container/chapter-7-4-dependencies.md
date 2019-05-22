@@ -541,3 +541,28 @@ Spring 支持具有命名空间的可扩展配置格式, 这些命名空间基�
 >p-namespace 不如标准 XML 格式灵活; 例如, 声明属性引用的格式与以 `Ref` 结尾的属性冲突, 而标准 XML 格式则不然; 我们建议你仔细选择你的方法并将其传达给你的团队成员, 以避免生成同时使用这三种方法的 XML 文档
 
 ##### 使用 c-namespace 的 XML 快捷方式
+和 `使用 c-namespace 的 XML 快捷方式` 小节类似, c-namespace 在 Spring 3.1 中引入, 允许使用内联属性来配置构造函数参数, 而不是嵌套的 `constructor-arg` 元素  
+让我们回顾一下带有 `c:namespace` 的基于构造函数的依赖注入一节中的示例
+```
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:c="http://www.springframework.org/schema/c"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="bar" class="x.y.Bar"/>
+    <bean id="baz" class="x.y.Baz"/>
+
+    <!-- traditional declaration -->
+    <bean id="foo" class="x.y.Foo">
+        <constructor-arg ref="bar"/>
+        <constructor-arg ref="baz"/>
+        <constructor-arg value="foo@bar.com"/>
+    </bean>
+
+    <!-- c-namespace declaration -->
+    <bean id="foo" class="x.y.Foo" c:bar-ref="bar" c:baz-ref="baz" c:email="foo@bar.com"/>
+
+</beans>
+```
+`c:namespace` 名称空间使用与 `p:namespace` (用于 bean 引用的trailing `-ref`) 有相同的约定, 用于按名称设置构造函数参数; 同样, 它需要声明, 即使它没有在 XSD 中定义 (但它存在于 Spring Core 中)
