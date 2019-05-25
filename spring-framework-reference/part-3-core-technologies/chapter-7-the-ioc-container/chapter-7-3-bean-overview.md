@@ -148,5 +148,5 @@ public class DefaultServiceLocator {
 ```
 这种方法表明工厂 bean 本身可以通过依赖注入 (DI) 进行管理和配置; 详见 [依赖和配置](https://docs.spring.io/spring/docs/4.3.20.RELEASE/spring-framework-reference/html/beans.html#beans-factory-properties-detailed)
 
->**参考:**
+>**参考:**  
 [Bean overview](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-definition)
