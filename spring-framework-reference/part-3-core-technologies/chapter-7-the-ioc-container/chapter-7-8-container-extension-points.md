@@ -121,8 +121,68 @@ jdbc.url=jdbc:hsqldb:hsql://production:9002
 jdbc.username=sa
 jdbc.password=root
 ```
-因此, 字符串 `${jdbc.username}` 在运行时将替换为值 'sa', 这同样适用于与属性文件中的键匹配的其他占位符值; `PropertyPlaceholderConfigurer` 检查 bean 定义的大多数属性和属性中的占位符; 此外, 可以自定义占位符前缀和后缀
+因此, 字符串 `${jdbc.username}` 在运行时将替换为值 'sa', 这同样适用于与属性文件中的键匹配的其他占位符值; `PropertyPlaceholderConfigurer` 检查 bean 定义的大多数属性和属性中的占位符; 此外, 可以自定义占位符前缀和后缀  
+使用 Spring 2.5 中引入的上下文命名空间, 可以使用专用配置元素配置属性占位符; 可以在 `location` 属性中提供一个或多个逗号分隔的列表作为 locations
+```
+<context:property-placeholder location="classpath:com/foo/jdbc.properties"/>
+```
+`PropertyPlaceholderConfigurer` 不仅在你指定的属性文件中查找属性; 默认情况下, 如果它在指定的属性文件中找不到属性, 它还会检查 Java System 属性; 你可以通过使用以下三个受支持的整数值之一设置 configurer 的 `systemPropertiesMode` 属性来自定义此行为
+- never(0): 不检查系统属性
+- fallback(1): 如果在指定的属性文件中无法解析, 则检查系统属性; 这是默认值
+- override(2): 在尝试指定的属性文件之前, 首先检查系统属性; 这允许系统属性覆盖任何其他属性源
 
+更多信息请参阅 `PropertyPlaceholderConfigurer` 的 javadocs
+>你可以使用 `PropertyPlaceholderConfigurer` 替换类名, 这在你必须在运行时选择特定实现类时有时很有用; 例如
+>```
+><bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+>    <property name="locations">
+>        <value>classpath:com/foo/strategy.properties</value>
+>    </property>
+>    <property name="properties">
+>        <value>custom.strategy.class=com.foo.DefaultStrategy</value>
+>    </property>
+></bean>
+>
+><bean id="serviceStrategy" class="${custom.strategy.class}"/>
+>```
+>如果在运行时无法将类解析为有效类, 则在即将创建 bean 时将失败, 当非 lazy-init bean的 `ApplicationContext` 的 `preInstantiateSingletons()` 阶段期间实例化时
+
+##### 示例: PropertyOverrideConfigurer
+`PropertyOverrideConfigurer` 是另一个bean factory post-processor, 类似于 `PropertyPlaceholderConfigurer`, 但与后者不同, 原始定义可以具有默认值, 或者根本不具有 bean 属性的值; 如果重写的 Properties 文件没有某个 bean 属性的条目, 则使用默认的上下文定义  
+请注意, bean 定义不知道被覆盖, 因此不能够立刻知道 XML 定义文件中使用覆盖配置器; 如果多个 `PropertyOverrideConfigurer` 实例为同一个 bean 属性定义了不同的值, 则由于覆盖机制, 最后一个实例将生效  
+Properties 文件配置格式如下
+```
+beanName.property=value
+```
+例如
+```
+dataSource.driverClassName=com.mysql.jdbc.Driver
+dataSource.url=jdbc:mysql:mydb
+```
+此示例文件可以与包含名为 dataSource 的 bean 的容器定义一起使用, 该 bean 具有 driver 和 url 属
+性  
+也支持复合属性名称, 只要路径的每个组件 (重写的最终属性除外) 都已经非空 (可能由构造函数初始化); 在这个例子中......
+```
+foo.fred.bob.sammy=123
+```
+将 foo bean 的 fred 属性的 bob 属性的 sammy 属性设置为 123
+>指定的覆盖值始终是字面值; 它们不会被翻译成 bean引用; 当 XML bean 定义中的原始值指定 bean 引用时, 此约定也适用
+
+使用 Spring 2.5 中引入的上下文命名空间, 可以使用专用配置元素配置属性覆盖
+```
+<context:property-override location="classpath:override.properties"/>
+```
+
+#### 使用 FactoryBean 自定义实例化逻辑
+为本身为工厂的对象实现 `org.springframework.beans.factory.FactoryBean` 接口  
+`FactoryBean` 接口是 Spring IoC 容器实例化逻辑的可插拔点; 如果你有更复杂的初始化代码, 这些代码在 Java 中更好地表达, 而不是 (可能) 冗长的 XML, 你可以创建自己的 `FactoryBean`, 在该类中编写复杂的初始化, 然后将自定义 `FactoryBean` 插入容器中  
+`FactoryBean` 接口提供以下三个方法
+- `Object getObject()`: 返回此工厂创建的对象的实例; 可以共享实例, 具体取决于此工厂是返回单例还是原型
+- `boolean isSingleton()`: 如果此 FactoryBean 返回单例, 则返回 `true`, 否则返回 `false`
+- `Class getObjectType()`: 返回 `getObject()` 方法返回的对象类型, 如果事先不知道类型, 则返回 `null`
+
+`FactoryBean` 概念和接口在 Spring Framework 中的许多地方使用; `FactoryBean` 接口的 50 多个实现随 Spring 一起提供  
+当你需要向容器询问实际的 `FactoryBean` 实例本身而不是它生成的 bean 时, 在调用 `ApplicationContext` 的 `getBean()` 方法时, 使用 `&` 符号作为 bean 的 `id` 前缀; 因此, 对于 `id` 为 myBean 的给定 FactoryBean, 在容器上调用 `getBean("myBean")` 将返回 `FactoryBean` 的产生的 bean; 而调用 `getBean("&myBean")` 会返回 `FactoryBean` 实例本身
 
 >**参考:**
 [Container Extension Points](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-factory-extension)
