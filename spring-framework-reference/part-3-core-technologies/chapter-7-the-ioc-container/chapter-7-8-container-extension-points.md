@@ -62,7 +62,66 @@ public class InstantiationTracingBeanPostProcessor implements BeanPostProcessor 
 
 </beans>
 ```
+请注意如何简单地定义 `InstantiationTracingBeanPostProcessor`; 它甚至可以没有名称, 因为它是一个 bean, 它可以像任何其他 bean 一样依赖注入; (前面的配置还定义了一个由 `Groovy` 脚本支持的 bean, Spring 动态语言支持在 [第 35 章动态语言支持](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/dynamic-language.html) 的章节中有详细介绍)  
+以下简单 Java 应用程序执行上述代码和配置
+```
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.scripting.Messenger;
 
+public final class Boot {
+
+    public static void main(final String[] args) throws Exception {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext("scripting/beans.xml");
+        Messenger messenger = (Messenger) ctx.getBean("messenger");
+        System.out.println(messenger);
+    }
+
+}
+```
+上述应用程序的输出类似于以下内容
+```
+Bean 'messenger' created : org.springframework.scripting.groovy.GroovyMessenger@272961
+org.springframework.scripting.groovy.GroovyMessenger@272961
+```
+
+##### 示例: RequiredAnnotationBeanPostProcessor
+将回调接口或注解与自定义 `BeanPostProcessor` 实现结合使用是扩展 Spring IoC 容器的常用方法; 一个例子是 Spring 的 `RequiredAnnotationBeanPostProcessor` ---  一个随 Spring 发行版一起提供的 `BeanPostProcessor` 实现, 它确保用 (任意) 在 beans 上注解标记的 JavaBean 属性实际上 (配置为) 依赖注入值
+
+#### 使用 BeanFactoryPostProcessor 自定义配置元数据
+我们将看到的下一个扩展点是 `org.springframework.beans.factory.config.BeanFactoryPostProcessor`; 这个接口的语义类似于 `BeanPostProcessor` 的语义, 主要区别在于: `BeanFactoryPostProcessor` 对 bean 配置元数据进行操作; 也就是说, Spring IoC 容器允许 `BeanFactoryPostProcessor` 读取配置元数据, 并可能在容器实例化除 `BeanFactoryPostProcessor` 之外的任何 bean 之前更改它  
+你可以配置多个 `BeanFactoryPostProcessor`, 并且可以通过设置 `order` 属性来控制这些 `BeanFactoryPostProcessor` 的执行顺序; 然而只能在 `BeanFactoryPostProcessor` 实现 `Ordered` 接口设置此属性; 如果编写自己的 `BeanFactoryPostProcessor`, 则应考虑实现 `Ordered` 接口; 有关更多详细信息, 见 `BeanFactoryPostProcessor` 和 `Ordered` 接口的 javadoc
+>如果要更改实际的 bean 实例 (即从配置元数据创建的对象), 则需要使用 `BeanPostProcessor` (如上面 [第 7.8.1 节 "使用 BeanPostProcessor 定制 bean"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-factory-extension-bpp) 中所述); 虽然技术上可以在 `BeanFactoryPostProcessor` 中使用 bean 实例 (例如, 使用 `BeanFactory.getBean()`), 但这样做会导致 bean 的过早实例化， 从而违反标准的容器生命周期; 这可能会导致负面影响, 例如绕过 bean post-processor
+>此外, `BeanFactoryPostProcessors` 的范围是每个容器; 这仅在你使用容器层次结构时才有意义; 如果在一个容器中定义 `BeanFactoryPostProcessor`, 它将仅应用于该容器中的 bean 定义; `BeanFactoryPostProcessor` 不会在另一个容器中对一个容器中的 Bean 定义进行后处理, 即使两个容器都是同一层次结构的一部分
+
+bean factory post-processor 在 `ApplicationContext` 中声明时自动执行, 以便将更改应用于定义容器的配置元数据; Spring 包含许多预定义的 bean 工厂后处理器, 例如 `PropertyOverrideConfigurer` 和 `PropertyPlaceholderConfigurer`; 例如, 也可以使用自定义 `BeanFactoryPostProcessor` 来注册自定义属性编辑器  
+`ApplicationContext` 自动检测部署到其中的任何实现 `BeanFactoryPostProcessor` 接口的 bean; 它在适当的时候使用这些 bean 作为 bean factory post-processor; 你可以像处理任何其他 bean 一样部署这些 post-processor bean  
+>与 `BeanPostProcessor` 一样, 你通常不希望为 `BeanFactoryPostProcessor` 配置延迟初始化; 因为如果没有其他 bean 引用 `Bean (Factory) PostProcessor`, 则该后处理器根本不会被实例化; 因此, 其标记为延迟初始化将被忽略, 即使在 `<beans/>` 元素的声明中将 `default-lazy-init` 属性设置为 true, 也会急切地实例化 Bean (Factory) PostProcessor
+
+##### 示例: 类名替换 PropertyPlaceholderConfigurer
+使用 `PropertyPlaceholderConfigurer` 可以将 bean 定义中的属性值外部化在一个使用标准 Java Properties 格式的单独文件中; 这样做可以使部署应用程序的人员自定义特定于环境的属性 (如数据库 URL 和密码), 而不会出现修改主 XML 定义文件或容器文件的复杂性或风险  
+请考虑以下基于 XML 的配置元数据片段, 其中定义了具有占位符值的 `DataSource`; 该示例显示了从外部属性文件配置的属性; 在运行时, `PropertyPlaceholderConfigurer` 应用于将替换 `DataSource` 的某些属性的元数据; 要替换的值指定为 `${property-name}` 形式的占位符, 该形式遵循 `Ant/log4j/JSPEL` 样式
+```
+<bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+    <property name="locations" value="classpath:com/foo/jdbc.properties"/>
+</bean>
+
+<bean id="dataSource" destroy-method="close"
+        class="org.apache.commons.dbcp.BasicDataSource">
+    <property name="driverClassName" value="${jdbc.driverClassName}"/>
+    <property name="url" value="${jdbc.url}"/>
+    <property name="username" value="${jdbc.username}"/>
+    <property name="password" value="${jdbc.password}"/>
+</bean>
+```
+实际值来自标准 Java Properties 格式的另一个文件
+```
+jdbc.driverClassName=org.hsqldb.jdbcDriver
+jdbc.url=jdbc:hsqldb:hsql://production:9002
+jdbc.username=sa
+jdbc.password=root
+```
+因此, 字符串 `${jdbc.username}` 在运行时将替换为值 'sa', 这同样适用于与属性文件中的键匹配的其他占位符值; `PropertyPlaceholderConfigurer` 检查 bean 定义的大多数属性和属性中的占位符; 此外, 可以自定义占位符前缀和后缀
 
 
 >**参考:**
