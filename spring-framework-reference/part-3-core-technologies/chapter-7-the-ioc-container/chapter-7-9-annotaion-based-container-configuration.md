@@ -197,6 +197,8 @@ public class MovieRecommender {
 >`@Autowired`, `@Inject`, `@Resource` 和 `@Value` 注解由 Spring BeanPostProcessor 实现处理, s这反过来意味着你不能在自己的 BeanPostProcessor 或 BeanFactoryPostProcessor 类型 (如果有) 中应用这些注释; 必须通过 XML 或使用 Spring `@Bean` 方法显式地 "连接" 这些类型
 
 #### 使用 @Primary 的细粒度的基于注解的自动装配
+由于按类型自动装配可能会导致多个候选, 因此通常需要对选择过程进行更多控制; 实现这一目标的一种方法是使用 Spring的 `@Primary` 注解; `@Primary` 指示当多个 bean 可以自动装配到单值依赖项时, 应该优先选择特定的 bean; 如果候选者中只存在一个 "主要的" bean, 则它将是自动装配的值
+
 
 >**参考:**  
 [Annotation-based container configuration](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-annotation-config)
