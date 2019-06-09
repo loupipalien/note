@@ -197,7 +197,107 @@ public class MovieRecommender {
 >`@Autowired`, `@Inject`, `@Resource` 和 `@Value` 注解由 Spring BeanPostProcessor 实现处理, s这反过来意味着你不能在自己的 BeanPostProcessor 或 BeanFactoryPostProcessor 类型 (如果有) 中应用这些注释; 必须通过 XML 或使用 Spring `@Bean` 方法显式地 "连接" 这些类型
 
 #### 使用 @Primary 的细粒度的基于注解的自动装配
-由于按类型自动装配可能会导致多个候选, 因此通常需要对选择过程进行更多控制; 实现这一目标的一种方法是使用 Spring的 `@Primary` 注解; `@Primary` 指示当多个 bean 可以自动装配到单值依赖项时, 应该优先选择特定的 bean; 如果候选者中只存在一个 "主要的" bean, 则它将是自动装配的值
+由于按类型自动装配可能会导致多个候选, 因此通常需要对选择过程进行更多控制; 实现这一目标的一种方法是使用 Spring的 `@Primary` 注解; `@Primary` 指示当多个 bean 可以自动装配到单值依赖项时, 应该优先选择特定的 bean; 如果候选者中只存在一个 "主要的" bean, 则它将是自动装配的值  
+假设我们有以下配置将 `firstMovieCatalog` 定义为主要的 `MovieCatalog`
+```
+@Configuration
+public class MovieConfiguration {
+
+    @Bean
+    @Primary
+    public MovieCatalog firstMovieCatalog() { ... }
+
+    @Bean
+    public MovieCatalog secondMovieCatalog() { ... }
+
+    // ...
+}
+```
+通过这样的配置, 以下 `MovieRecommender` 将与 `firstMovieCatalog` 一起自动装配
+```
+public class MovieRecommender {
+
+    @Autowired
+    private MovieCatalog movieCatalog;
+
+    // ...
+}
+```
+相应的 XML 配置 bean 定义如下所示
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        https://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:annotation-config/>
+
+    <bean class="example.SimpleMovieCatalog" primary="true">
+        <!-- inject any dependencies required by this bean -->
+    </bean>
+
+    <bean class="example.SimpleMovieCatalog">
+        <!-- inject any dependencies required by this bean -->
+    </bean>
+
+    <bean id="movieRecommender" class="example.MovieRecommender"/>
+
+</beans>
+```
+`@Qualifier` 注解也可以在各个构造函数参数或方法参数上指定
+```
+public class MovieRecommender {
+
+    private MovieCatalog movieCatalog;
+
+    private CustomerPreferenceDao customerPreferenceDao;
+
+    @Autowired
+    public void prepare(@Qualifier("main")MovieCatalog movieCatalog,
+            CustomerPreferenceDao customerPreferenceDao) {
+        this.movieCatalog = movieCatalog;
+        this.customerPreferenceDao = customerPreferenceDao;
+    }
+
+    // ...
+}
+```
+相应的 XML 配置 bean 定义如下所示; 具有限定符值 "main" 的 bean 与使用相同值限定的构造函数参数连接
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        https://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:annotation-config/>
+
+    <bean class="example.SimpleMovieCatalog">
+        <qualifier value="main"/>
+
+        <!-- inject any dependencies required by this bean -->
+    </bean>
+
+    <bean class="example.SimpleMovieCatalog">
+        <qualifier value="action"/>
+
+        <!-- inject any dependencies required by this bean -->
+    </bean>
+
+    <bean id="movieRecommender" class="example.MovieRecommender"/>
+
+</beans>
+```
+对于回退匹配, bean 名称被视为默认限定符值; 因此, 你可以使用 `id` 为 "main" 而不是嵌套的限定符元素来定义 bean, 从而得到相同的匹配结果; 但是, 虽然你可以使用此约定来按名称引用特定 bean, 但 `@Autowired` 基本上是关于具有可选语义限定符的类型驱动注入; 这意味着即使使用 bean 名称回退, 限定符值在类型匹配集中也总是具有缩小的语义; 它们在语义上不表示对唯一 bean `id` 的引用; 好的限定符值是 "main" 或 "EMEA" 或 "persistent", 表示独立于 bean `id` 的特定组件的特征, 在匿名 bean 定义的情况下可以自动生成, 如上例中的那个  
+限定符也适用于类型化集合, 如上所述, 例如: `Set<MovieCatalog>`; 在这种情况下, 根据声明的限定符的所有匹配 bean 都作为集合注入; 这意味着限定符不必是唯一的, 它们只是简单地构成过滤标准; 例如, 你可以使用相同的限定符值 "action" 定义多个 `MovieCatalog` bean, 所有这些 bean 都将注入到使用 `@Qualifier("action")` 注解的 `Set<MovieCatalog>` 中
+>
 
 
 >**参考:**  
