@@ -333,6 +333,27 @@ public class AppConfig {
 ```
 
 #### 使用 @Configuration 注解
+`@Configuration` 是一个类级别注释, 指示对象是 bean 定义的来源; `@Configuration` 类通过公共 `@Bean` 注释方法声明 bean; 在 `@Configuration` 类上调用 `@Bean` 方法也可用于定义 bean 间依赖关系; 有关介绍请参见 [第 7.12.1 节 "基本概念: `@Bean` 和 `@Configuration`"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-java-basic-concepts)
+
+##### 注入内部 bean 依赖
+当 `@Beans` 彼此依赖时, 表达该依赖关系就像让一个 bean 方法调用另一个一样简单
+```
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public Foo foo() {
+        return new Foo(bar());
+    }
+
+    @Bean
+    public Bar bar() {
+        return new Bar();
+    }
+}
+```
+在上面的示例中, `foo` bean 通过构造函数注入接收对 bar 的引用
+
 
 >**参考:**  
 [Java-based container configuration](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-java)
