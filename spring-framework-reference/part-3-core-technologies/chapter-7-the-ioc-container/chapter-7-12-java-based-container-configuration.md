@@ -353,7 +353,45 @@ public class AppConfig {
 }
 ```
 在上面的示例中, `foo` bean 通过构造函数注入接收对 bar 的引用
+>这种声明 bean 间依赖关系的方法仅在 `@Configuration` 注解的类中声明 `@Bean` 方法时才有效; 你不能使用普通的 `@Component` 注解的类声明 bean 间依赖关系
 
+##### Lookup 方法注入
+如前所述, `Lookup 方法注入` 是一项很少使用的高级功能; 在单例范围的 bean 依赖于原型范围的 bean 的情况下它很有用; 将 Java 用于此类配置提供了实现此模式的自然方法
+```
+public abstract class CommandManager {
+    public Object process(Object commandState) {
+        // grab a new instance of the appropriate Command interface
+        Command command = createCommand();
+        // set the state on the (hopefully brand new) Command instance
+        command.setState(commandState);
+        return command.execute();
+    }
+
+    // okay... but where is the implementation of this method?
+    protected abstract Command createCommand();
+}
+```
+使用 Java 配置支持, 你可以创建 `CommandManager` 的子类, 其中抽象的 `createCommand()` 方法被覆盖, 以便查找新的 (原型) `Command` 对象
+```
+@Bean
+@Scope("prototype")
+public AsyncCommand asyncCommand() {
+    AsyncCommand command = new AsyncCommand();
+    // inject dependencies here as required
+    return command;
+}
+
+@Bean
+public CommandManager commandManager() {
+    // return new anonymous implementation of CommandManager with command() overridden
+    // to return a new prototype Command object
+    return new CommandManager() {
+        protected Command createCommand() {
+            return asyncCommand();
+        }
+    }
+}
+```
 
 >**参考:**  
 [Java-based container configuration](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/beans.html#beans-java)
