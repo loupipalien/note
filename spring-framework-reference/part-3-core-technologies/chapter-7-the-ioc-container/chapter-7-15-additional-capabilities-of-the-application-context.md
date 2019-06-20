@@ -300,6 +300,29 @@ public class EntityCreatedEvent<T> extends ApplicationEvent implements Resolvabl
 >这不仅适用于 `ApplicationEvent`, 也适用于你作为事件发送的任意对象
 
 #### 方便地访问低级资源
+为了最佳地使用和理解应用程序上下文, 用户通常应该熟悉 Spring 的资源抽象, 如 [第 8 章 "Resource" 一章](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/resources.html) 所述  
+应用程序上下文是 `ResourceLoader`, 可用于加载资源; `Resource` 本质上是 JDK 类 `java.net.URL` 的功能更丰富的版本; 实际上, `Resource` 的实现在适当的地方包装了 `java.net.URL` 的实例; 资源可以透明的方式从几乎任何位置获取低级资源, 包括从类路径, 文件系统位置, 任何可用标准 URL 描述的位置, 以及一些其他变体; 如果资源位置字符串是没有任何特殊前缀的简单路径, 那么这些资源来自特定且适合于实际应用程序上下文类型  
+你可以配置部署到应用程序上下文中的 bean, 以实现特殊的回调接口 `ResourceLoaderAware`, 在初始化时自动回调, 应用程序上下文本身作为 `ResourceLoader` 传入; 你还可以公开 `Resource` 类型的属性, 以用于访问静态资源, 它们将像任何其他属性一样注入其中; 你可以将这些 `Resource` 属性指定为简单的 `String` 路径, 并依赖于上下文自动注册的特殊 JavaBean `PropertyEditor`, 以便在部署 Bean 时将这些文本字符串转换为实际的 `Resource` 对象  
+提供给 `ApplicationContext` 构造函数的位置路径实际上是资源字符串, 并且以简单形式适当地处理特定上下文实现; `ClassPathXmlApplicationContext` 将简单的位置路径视为类路径位置; 你还可以使用具有特殊前缀的位置路径 (资源字符串) 来强制从类路径或 `URL` 加载定义, 而不管实际的上下文类型如何
+
+#### 方便的 Web 应用程序的 ApplicationContext 实例化
+你可以使用例如 `ContextLoader` 以声明方式创建 `ApplicationContext` 实例; 当然, 你也可以使用其中一个 `ApplicationContext` 实现以编程方式创建 `ApplicationContext`
+实例  
+你可以使用 `ContextLoaderListener` 注册 `ApplicationContext`, 如下所示
+```
+<context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>/WEB-INF/daoContext.xml /WEB-INF/applicationContext.xml</param-value>
+</context-param>
+
+<listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+```
+监听器检查 `contextConfigLocation` 参数; 如果参数不存在, 则监听器将 `/WEB-INF/applicationContext.xml` 用作默认值; 当参数确实存在时, 监听器使用预定义的分隔符 (逗号, 分号和空格) 分隔 `String`, 并将值用作将搜索应用程序上下文的位置; 还支持 `Ant` 样式的路径模式; 名称以 "Context.xml" 结尾的所有文件的 `/WEB-INF/*Context.xml`, 驻留在 "WEB-INF" 目录中, `/ WEB-INF/**/*Context.xml` 表示所有 "Context.xml" 结尾文件, 这些文件位于 "WEB-INF" 的任何子目录中
+
+#### 将 Spring ApplicationContext 部署为Java EE RAR 文件
+TODO
 
 
 >**参考:**
