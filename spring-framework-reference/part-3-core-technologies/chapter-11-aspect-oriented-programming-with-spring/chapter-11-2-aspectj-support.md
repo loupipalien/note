@@ -53,9 +53,16 @@ private void anyOldTransfer() {}// the pointcut signature
 `@Pointcut` 注解值的切入点表达式形式是常规的 AspectJ 5 切入点表达式; 有关 AspectJ 的切入点语言的完整讨论, 请参阅 [AspectJ 编程指南](https://www.eclipse.org/aspectj/doc/released/progguide/index.html) (以及扩展, [AspectJ 5 开发人员手册](https://www.eclipse.org/aspectj/doc/released/adk15notebook/index.html)) 或 AspectJ 上的一本书, 例如 Colyer 的 "Eclipse AspectJ" 或 Ramnivas Laddad 的 "AspectJ in Action"
 
 ##### 支持的切入点指示符
-
-
-
+Spring AOP 支持以下 AspectJ 切入点指示符 (PCD), 用于切入点表达式
+```
+其他切入点类型
+完整的 AspectJ 切入点语言支持 Spring 中不支持的其他切入点指示符; 它们是: `call, get, set, preinitialization, staticinitialization, initialization, handler, adviceexecution, withincode, cflow, cflowbelow, if, @this, @withincode`; 在 Spring AOP 解释的切入点表达式中使用这些切入点指示符将导致抛出 IllegalArgumentException  
+Spring AOP 支持的切入点指示符集可以在将来的版本中进行扩展, 以支持更多的 AspectJ 切入点指示符
+```
+- execution: 对于匹配方法执行连接点, 这是在使用 Spring AOP 时将使用的主要切入点指示符
+- within: 限制匹配以连接某些类型中的点 (仅使用 Spring AOP 时执行在匹配类型中声明的方法)
+- this: 限制匹配到连接点 (使用 Spring AOP 时执行方法) 其中 bean 引用 (Spring AOP 代理) 是给定类型的实例
+- target: 限制匹配连接点 (使用 Spring AOP 时执行方法), 其中目标对象 (被代理的应用程序对象) 是给定类型的实例
 
 >**参考:**
 [@AspectJ support](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj)
