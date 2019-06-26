@@ -63,6 +63,134 @@ Spring AOP 支持的切入点指示符集可以在将来的版本中进行扩展
 - within: 限制匹配以连接某些类型中的点 (仅使用 Spring AOP 时执行在匹配类型中声明的方法)
 - this: 限制匹配到连接点 (使用 Spring AOP 时执行方法) 其中 bean 引用 (Spring AOP 代理) 是给定类型的实例
 - target: 限制匹配连接点 (使用 Spring AOP 时执行方法), 其中目标对象 (被代理的应用程序对象) 是给定类型的实例
+- args: 限制匹配到连接点 (使用 Spring AOP 时执行方法), 其中参数是给定类型的实例
+- @target: 限制匹配到连接点 (使用 Spring AOP 时执行方法), 其中执行对象的类具有给定类型的注解
+- @args: 限制匹配到连接点 (使用 Spring AOP 时执行方法), 其中传递的实际参数的运行时类型具有给定类型的注解
+- @within: 限制匹配以连接具有给定注解的类型中的点 (使用 Spring AOP 时在具有给定注解的类型中声明的方法的执行)
+- @annotation: 限制匹配到连接点的对象, 其中连接点的对象 (在 Spring AOP 中执行的方法) 具有给定的注释
+
+由于 Spring AOP 仅限制与方法执行连接点的匹配, 因此上面对切入点指示符的讨论给出了比在 AspectJ 编程指南中找到的更窄的定义; 此外, AspectJ 本身具有基于类型的语义, 并且在执行连接点, `this` 和 `target` 都引用同一个对象 --- 执行该方法的对象; Spring AOP 是一个基于代理的系统, 它区分代理对象本身 (绑定到此) 和代理后面的目标对象 (绑定到目标)
+>由于 Spring 的 AOP 框架基于代理的特性, 目标对象内的调用根据定义不会被截获; 对于 JDK 代理, 只能拦截代理上的公共接口方法调用; 使用 CGLIB, 代理上的公共和受保护方法调用将被拦截, 甚至包括必要的包可见方法; 但是, 通过代理进行的常见交互应始终通过公共签名进行设计
+>请注意, 切入点定义通常与任何截获的方法匹配; 如果切入点严格意义上是公开的, 即使在通过代理进行潜在非公共交互的 CGLIB 代理方案中, 也需要相应地定义切入点。
+>如果你的拦截需要包括目标类中的方法调用甚至构造函数, 请考虑使用 Spring 驱动的 [原生 AspectJ 编织](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-aj-ltw) 而不是 Spring 的基于代理的 AOP 框架; 这构成了具有不同特征的不同 AOP 使用模式, 因此在做出决定之前一定要先熟悉编织
+
+Spring AOP 还支持另一个名为 `bean` 的 PCD; 此 PCD 允许你将连接点的匹配限制为特定的命名 Spring bean, 或限制为一组命名的 Spring bean (使用通配符时); `bean` PCD 具有以下形式
+```
+bean(idOrNameOfBean)
+```
+`idOrNameOfBean` 标记可以是任何 Spring bean 的名称: 提供了使用 `*` 字符的有限通配符支持, 因此如果为 Spring bean 建立一些命名约定, 则可以非常轻松地编写 bean PCD 表达式以将其选中; 与其他切入点指示符的情况一样, bean PCD 可以使用 `&&, ||, !`
+>请注意, bean PCD 仅在 Spring AOP 中受支持 --- 而不是在原生 AspectJ 编织中; 它是 AspectJ 定义的标准 PCD的 Spring 特定扩展, 因此不适用于 `@Aspect` 模型中声明的切面
+>bean PCD 在实例级别 (基于 Spring bean 名称概念) 而不是仅在类型级别 (这是基于编织的 AOP 限制)运行; 基于实例的切入点指示符是 Spring 基于代理的 AOP 框架的一种特殊功能, 它与 Spring bean 工厂紧密集成, 通过名称可以自然而直接地识别特定的 bean
+
+##### 组合切入点表达式
+可以使用 `&&, ||, !` 组合切入点表达式; 也可以通过名称引用切入点表达式; 以下示例显示了三个切入点表达式: `anyPublicOperation` (如果方法执行连接点表示任何公共方法的执行, 则匹配); `inTrading` (如果方法执行在交易模块中, 则匹配) 和 `tradingOperation` (如果方法执行代表交易模块中的任何公共方法, 则匹配)
+```
+@Pointcut("execution(public * *(..))")
+private void anyPublicOperation() {}
+
+@Pointcut("within(com.xyz.someapp.trading..*)")
+private void inTrading() {}
+
+@Pointcut("anyPublicOperation() && inTrading()")
+private void tradingOperation() {}
+```
+如上所示, 最佳实践是从较小的命名组件构建更复杂的切入点表达式; 当按名称引用切入点时, 将应用常规 Java 可见性规则 (你可以看到相同类型的私有切入点, 层次结构中受保护的切入点, 任何地方的公共切入点等等); 可见性不会影响切入点匹配
+
+##### 共享通用切入点的定义
+使用企业应用程序时, 你经常需要从几个方面引用应用程序的模块和特定的操作集; 我们建议定义一个 "SystemArchitecture" 的切面, 为此目的捕获常见的切入点表达式; 典型的这种切面看起来如下
+```
+package com.xyz.someapp;
+
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+
+@Aspect
+public class SystemArchitecture {
+
+    /**
+     * A join point is in the web layer if the method is defined
+     * in a type in the com.xyz.someapp.web package or any sub-package
+     * under that.
+     */
+    @Pointcut("within(com.xyz.someapp.web..*)")
+    public void inWebLayer() {}
+
+    /**
+     * A join point is in the service layer if the method is defined
+     * in a type in the com.xyz.someapp.service package or any sub-package
+     * under that.
+     */
+    @Pointcut("within(com.xyz.someapp.service..*)")
+    public void inServiceLayer() {}
+
+    /**
+     * A join point is in the data access layer if the method is defined
+     * in a type in the com.xyz.someapp.dao package or any sub-package
+     * under that.
+     */
+    @Pointcut("within(com.xyz.someapp.dao..*)")
+    public void inDataAccessLayer() {}
+
+    /**
+     * A business service is the execution of any method defined on a service
+     * interface. This definition assumes that interfaces are placed in the
+     * "service" package, and that implementation types are in sub-packages.
+     *
+     * If you group service interfaces by functional area (for example,
+     * in packages com.xyz.someapp.abc.service and com.xyz.someapp.def.service) then
+     * the pointcut expression "execution(* com.xyz.someapp..service.*.*(..))"
+     * could be used instead.
+     *
+     * Alternatively, you can write the expression using the 'bean'
+     * PCD, like so "bean(*Service)". (This assumes that you have
+     * named your Spring service beans in a consistent fashion.)
+     */
+    @Pointcut("execution(* com.xyz.someapp..service.*.*(..))")
+    public void businessService() {}
+
+    /**
+     * A data access operation is the execution of any method defined on a
+     * dao interface. This definition assumes that interfaces are placed in the
+     * "dao" package, and that implementation types are in sub-packages.
+     */
+    @Pointcut("execution(* com.xyz.someapp.dao.*.*(..))")
+    public void dataAccessOperation() {}
+
+}
+```
+在这样的切面定义的切入点可以被引用到你需要切入点表达式的任何地方; 例如, 要使服务层具有事务性, 可以编写为
+```
+<aop:config>
+    <aop:advisor
+        pointcut="com.xyz.someapp.SystemArchitecture.businessService()"
+        advice-ref="tx-advice"/>
+</aop:config>
+
+<tx:advice id="tx-advice">
+    <tx:attributes>
+        <tx:method name="*" propagation="REQUIRED"/>
+    </tx:attributes>
+</tx:advice>
+```
+`<aopconfig>` 和 `<aopadvisor>` 元素将在 [第 11.3 节 "基于模式的 AOP 支持"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-schema) 中讨论; [第 17 章 "事务管理"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/transaction.html) 中讨论了事务元素
+
+##### 示例
+Spring AOP 用户可能最常使用执行切入点指示符, 执行表达式的格式为:
+```
+execution(modifiers-pattern? ret-type-pattern declaring-type-pattern? name-pattern(param-pattern) throws-pattern?)
+```
+除返回类型模式 (上面的代码段中的 `ret-type-pattern`), 名称模式和参数模式之外的所有部分都是可选的; 返回类型模式确定方法的返回类型必须是什么才能匹配连接点; 最常见的是, 你将使用 `*` 作为返回类型模式, 它匹配任何返回类型; 仅当方法返回给定类型时, 完全限定类型名称才匹配; 名称模式与方法名称匹配; 你可以使用 `*` 通配符作为名称模式的全部或部分; 如果指定声明类型模式, 则包括尾随 `.` 将其加入名称模式组件; 参数模式稍微复杂一些: `()` 匹配不带参数的方法, 而 `(..)` 匹配任意数量的参数 (零或更多); 模式 `(*)` 匹配采用任何类型的一个参数的方法, `(*, String)` 匹配采用两个参数的方法, 第一个可以是任何类型, 第二个必须是 `String`; 有关更多信息, 请参阅 AspectJ编程指南的 [语言语义](https://www.eclipse.org/aspectj/doc/released/progguide/semantics-pointcuts.html) 部分  
+下面给出了常见切入点表达式的一些示例
+- 执行任何公共方法
+```
+execution(public * *(..))
+```
+- 执行任何以 `set` 开头的方法
+```
+execution(* set*(..))
+```
+
+
 
 >**参考:**
 [@AspectJ support](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj)
