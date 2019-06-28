@@ -189,7 +189,10 @@ execution(public * *(..))
 ```
 execution(* set*(..))
 ```
-
+- 执行 `AccountService` 接口定义的任何方法
+```
+execution(* com.xyz.service.AccountService.*(..))
+```
 
 
 >**参考:**
