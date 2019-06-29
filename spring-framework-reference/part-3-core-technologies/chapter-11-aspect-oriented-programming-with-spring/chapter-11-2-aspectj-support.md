@@ -193,7 +193,10 @@ execution(* set*(..))
 ```
 execution(* com.xyz.service.AccountService.*(..))
 ```
-
+- 执行 service 包中定义的任何方法
+```
+execution(* com.xyz.service.*.*(..))
+```
 
 >**参考:**
 [@AspectJ support](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj)
