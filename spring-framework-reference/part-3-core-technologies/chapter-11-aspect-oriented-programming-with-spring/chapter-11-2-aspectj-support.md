@@ -201,6 +201,226 @@ execution(* com.xyz.service.*.*(..))
 ```
 execution(* com.xyz.service..*.*(..))
 ```
+- service 包中的任何连接点 (仅在 Spring AOP 中执行方法)
+```
+within(com.xyz.service.*)
+```
+- service 包或子包中的任何连接点 (仅在 Spring AOP 中执行方法)
+```
+within(com.xyz.service..*)
+```
+- 代理实现 `AccountService` 接口的任何连接点 (仅在 Spring AOP 中执行方法)
+```
+this(com.xyz.service.AccountService)
+```
+>`this` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供代理对象通知
+- 目标对象实现 `AccountService` 接口的任何连接点 (仅在 Spring AOP 中执行方法)
+```
+target(com.xyz.service.AccountService)
+```
+>`target` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供目标对象的通知
+- 任何连接点 (仅在 Spring AOP 中执行的方法), 它接受一个参数, 并且在运行时传递的参数是 `Serializable`
+```
+args(java.io.Serializable)
+```
+>`args` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供代理对象通知
+
+请注意, 此示例中给出的切入点与 `execution(* *(java.io.Serializable))` 不同：如果在运行时传递的参数是 `Serializable` 则 args 版本匹配, 如果方法签名声明单个参数类型 `Serializable` 则执行版本匹配
+- 任何连接点 (仅在 Spring AOP 中执行的方法), 其中目标对象具有 `@Transactional` 注解
+```
+@target(org.springframework.transaction.annotation.Transactional)
+```
+>`@target` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供代理对象通知
+
+- 任何连接点 (仅在 Spring AOP 中执行方法), 其中目标对象的声明类型具有 `@Transactional` 注解
+```
+@within(org.springframework.transaction.annotation.Transactional)
+```
+>`@within` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供代理对象通知
+
+- 任何连接点 (仅在 Spring AOP 中执行方法), 其中执行方法具有 `@Transactional` 注解
+```
+@annotation(org.springframework.transaction.annotation.Transactional)
+```
+>`@annotation` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供代理对象通知
+
+- 任何连接点 (仅在 Spring AOP 中执行的方法), 它接受一个参数并且其运行时类型具有 `@Classified` 注解
+```
+@args(com.xyz.security.Classified)
+```
+>`@args` 更常用于绑定形式: 请参阅以下有关如何在通知体中提供代理对象通知
+
+- 名为 `tradeService` 的 Spring bean 上的任何连接点 (仅在 Spring AOP 中执行方法)
+```
+bean(tradeService)
+```
+- Spring bean 上的任何连接点 (仅在 Spring AOP 中执行方法), 其名称与通配符表达式 `*Service` 匹配
+```
+bean(*Service)
+```
+
+##### 写出好的切入点
+在编译期间, AspectJ 处理切入点以尝试和优化匹配性能; 检查代码并确定每个连接点是否 (静态地或动态地) 匹配给定切入点是一个代价高昂的过程; (动态匹配意味着无法通过静态分析完全确定匹配, 并且将在代码中放置测试以确定代码运行时是否存在实际匹配); 在第一次遇到切入点声明时, AspectJ 会将其重写为匹配过程的最佳形式; 这是什么意思? 基本上切入点在 `DNF (析取范式)` 中重写, 并且切入点的组件被排序, 以便首先检查那些评估成本更低的组件; 这意味着你不必担心理解各种切入点指示符的性能, 并且可以在切入点声明中以任何顺序提供它们  
+但是, AspectJ 只能处理它所说的内容, 并且为了获得最佳匹配性能, 你应该考虑它们想要实现的目标, 并在定义中尽可能缩小匹配的搜索空间; 现有的指示符自然分为三组: `kinded, scoping, context`
+- Kinded 指示符是选择特定类型的连接点的指示符; 例如: `execution, get, set, call, handler`
+- Scoping 界定指示符是那些选择一组感兴趣的连接点 (可能是多种类型) 的指示符; 例如: `within, withincode`
+- Contextual 指示符是基于上下文匹配 (并且可选地绑定) 的指示符; 例如: `this, target, @annotation`
+
+一个写得很好的切入点应该尝试包括至少前两种类型 (kinded 和 scoping), 而如果希望基于连接点上下文匹配, 则可以包括上下文指示符, 或者绑定该上下文以在通知中使用; 仅提供一个 `kinded` 指示符或仅提供 `context` 指示符将起作用, 但由于所有额外的处理和分析, 可能会影响编织性能 (使用的时间和内存); `scoping` 指示符非常快速匹配, 它们的使用意味着 AspectJ 可以非常快速地解除不应该进一步处理的连接点组 --- 这就是为什么如果可能的话, 一个好的切入点应该总是包含一个
+
+#### 声明通知
+通知与切入点表达式相关联, 并在切入点匹配的方法执行之前, 之后或周围运行; 切入点表达式可以是对命名切入点的简单引用, 也可以是在适当位置声明的切入点表达式
+
+##### Before advice
+在切面中使用 `@Before` 注解声明前置通知
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+
+@Aspect
+public class BeforeExample {
+
+    @Before("com.xyz.myapp.SystemArchitecture.dataAccessOperation()")
+    public void doAccessCheck() {
+        // ...
+    }
+
+}
+```
+如果使用就地切入点表达式, 我们可以将上面的示例重写为
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+
+@Aspect
+public class BeforeExample {
+
+    @Before("execution(* com.xyz.myapp.dao.*.*(..))")
+    public void doAccessCheck() {
+        // ...
+    }
+
+}
+```
+##### 后置返回通知
+后置返回通知匹配的方法在正常返回后执行, 它是使用 `@AfterReturning` 注解声明的
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.AfterReturning;
+
+@Aspect
+public class AfterReturningExample {
+
+    @AfterReturning("com.xyz.myapp.SystemArchitecture.dataAccessOperation()")
+    public void doAccessCheck() {
+        // ...
+    }
+
+}
+```
+>注意: 当然可以在同一切面内有多个通知声明和其他成员; 我们只是在这些例子中展示了一个通知声明, 专注于当时正在讨论的问题
+
+有时你需要在通知体中访问返回的实际值, 你可以使用 `@AfterReturning` 的形式来绑定返回值
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.AfterReturning;
+
+@Aspect
+public class AfterReturningExample {
+
+    @AfterReturning(
+        pointcut="com.xyz.myapp.SystemArchitecture.dataAccessOperation()",
+        returning="retVal")
+    public void doAccessCheck(Object retVal) {
+        // ...
+    }
+
+}
+```
+`returns` 属性中使用的名称必须与通知方法中的参数名称相对应; 当方法执行返回时, 返回值将作为相应的参数值传递给通知方法; 返回子句还将匹配限制为仅返回指定类型的值的那些方法执行 (在这种情况下, Object 将匹配任何返回值)  
+请注意, 在使用返回后的通知时, 无法返回完全不同的引用
+
+##### 后置异常通知
+后置异常通知运行时, 匹配的方法执行通过抛出异常退出, 它是使用 `@AfterThrowing` 注解声明的
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.AfterThrowing;
+
+@Aspect
+public class AfterThrowingExample {
+
+    @AfterThrowing("com.xyz.myapp.SystemArchitecture.dataAccessOperation()")
+    public void doRecoveryActions() {
+        // ...
+    }
+
+}
+```
+通常, 你希望仅在抛出给定类型的异常时才运行通知, 并且你还经常需要访问通知体中的抛出异常; 使用 `throwing` 属性来限制匹配 (如果需要, 否则使用 `Throwable` 作为异常类型) 并将抛出的异常绑定到通知参数
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.AfterThrowing;
+
+@Aspect
+public class AfterThrowingExample {
+
+    @AfterThrowing(
+        pointcut="com.xyz.myapp.SystemArchitecture.dataAccessOperation()",
+        throwing="ex")
+    public void doRecoveryActions(DataAccessException ex) {
+        // ...
+    }
+
+}
+```
+`throw` 属性中使用的名称必须与通知方法中的参数名称相对应; 当通过抛出异常退出方法时, 异常将作为相应的参数值传递给通知方法; `throw` 子句还将匹配仅限于那些抛出指定类型异常的方法执行 (在本例中为 `DataAccessException`)
+
+##### 后置 (最终) 通知
+在后置 (最终) 通知运行时, 匹配的方法执行退出; 它是使用 `@After` 注解声明的; 在通知必须准备好处理正常和异常返回条件; 它通常用于释放资源等
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.After;
+
+@Aspect
+public class AfterFinallyExample {
+
+    @After("com.xyz.myapp.SystemArchitecture.dataAccessOperation()")
+    public void doReleaseLock() {
+        // ...
+    }
+
+}
+```
+
+##### 环绕通知
+最后一种通知是环绕通知, 周围的通知围绕匹配的方法执行运行; 它有机会在方法执行之前和之后完成工作, 并确定方法实际上何时, 如何, 甚至是否实际执行; 如果你需要以线程安全的方式 (例如, 启动和停止计时器) 在方法执行之前和之后共享状态, 则经常使用环绕通知; 始终使用符合你要求的最小的通知形式 (即如果简单, 能使用前置通知就不要使用环绕通知)  
+使用 `@Around` 注解声明环绕通知, 通知方法的第一个参数必须是 `ProceedingJoinPoint` 类型; 在通知的主体内, 在 `ProceedingJoinPoint` 上调用 `proceed()` 会导致执行基础方法; `proceed()` 也可以调用传递给 `Object[]` --- 数组中的值将用作方法执行的参数
+>使用 `Object[]` 调用时, `proceed()` 的行为与由 AspectJ 编译器编译的环绕通知的行为略有不同; 对于使用传统 AspectJ 语言编写的环绕通知, 传递给 `proceed()` 的参数数量必须与传递给环绕通知的参数数量 (不是基础连接点所采用的参数数量) 相匹配, 并且传递给的值继续给定的参数位置取代了值绑定到的实体的连接点的原始值 (如果现在没有意义, 不要担心!); Spring 采用的方法更简单, 更好地匹配其基于代理的, 仅执行语义; 如果要编译为 Spring 编写的 `@AspectJ` 切面并使用带有 AspectJ 编译器和 weaver 的参数继续, 则只需要知道这种差异; 有一种方法可以编写这样的切面, 这些切面在 Spring AOP 和 AspectJ 上都是 100% 兼容的, 这将在下面的通知参数部分中讨论
+
+```
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.ProceedingJoinPoint;
+
+@Aspect
+public class AroundExample {
+
+    @Around("com.xyz.myapp.SystemArchitecture.businessService()")
+    public Object doBasicProfiling(ProceedingJoinPoint pjp) throws Throwable {
+        // start stopwatch
+        Object retVal = pjp.proceed();
+        // stop stopwatch
+        return retVal;
+    }
+
+}
+```
+环绕通知返回的值将是方法调用者看到的返回值; 例如, 一个简单的缓存方面可以从缓存中返回一个值 (如果有的话), 如果没有则调用 `proceed()`; 请注意, 可以在环绕建议的主体内调用一次, 多次, 或者根本不调用, 所有这些都是合乎逻辑的
+
+##### 通知参数
+Spring 提供全类型的通知 --- 意味着你在通知签名中声明了所需的参数 (正如我们在上面看到的返回和抛出示例所示), 而不是一直使用 `Object[]` 数组; 我们将看到如何在一瞬间为通知主体提供参数和其他上下文值; 首先让我们来看看如何编写通用通知, 以便了解通知目前的方法
+##### 访问当前的连接点
+
 
 >**参考:**
 [@AspectJ support](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj)
