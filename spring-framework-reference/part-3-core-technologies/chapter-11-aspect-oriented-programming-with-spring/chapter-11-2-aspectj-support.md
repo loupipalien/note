@@ -420,7 +420,231 @@ public class AroundExample {
 ##### 通知参数
 Spring 提供全类型的通知 --- 意味着你在通知签名中声明了所需的参数 (正如我们在上面看到的返回和抛出示例所示), 而不是一直使用 `Object[]` 数组; 我们将看到如何在一瞬间为通知主体提供参数和其他上下文值; 首先让我们来看看如何编写通用通知, 以便了解通知目前的方法
 ##### 访问当前的连接点
+任何通知方法都可以声明它的第一个参数为 `org.aspectj.lang.JoinPoint` 类型的参数 (请注意, 需要提供通知来声明一个类型为 `ProceedingJoinPoint` 的第一个参数, 它是 `JoinPoint` 的一个子类; `JoinPoint` 接口提供了一些有用的方法, 如 `getArgs()`(返回方法参数), `getThis()` (返回代理对象), `getTarget()` (返回目标对象), `getSignature()` (返回被建议的方法的描述) 和 `toString()` (打印一个有用的描述方法); 请查阅 javadocs 以获取完整的详细信息
+##### 传递参数给通知
+我们已经看到了如何绑定返回的值或异常值 (使用后置返回和后置异常类型通知); 要使参数值可用于通知体, 你可以使用 `args` 的绑定形式; 如果在 `args` 表达式中使用参数名称代替类型名称, 则在调用通知时, 相应参数的值将作为参数值传递; 一个例子应该使这更清楚, 假设你要通知执行以 `Account` 对象作为第一个参数的 `dao` 操作, 并且你需要访问通知体中的帐户; 你可以写下面的内容
+```
+@Before("com.xyz.myapp.SystemArchitecture.dataAccessOperation() && args(account,..)")
+public void validateAccount(Account account) {
+    // ...
+}
+```
+切入点表达式的 `args(account, ..)` 部分有两个目的: 首先它将匹配仅限于那些方法至少有一个参数的方法执行, 而传递给该参数的参数是 `Account` 的一个实例; 其次，它通过 `account` 参数使实际的 `Account` 对象可用于通知  
+另一种编写方法是声明一个切入点, 当它与连接点匹配时 "提供" `Account` 对象值, 然后从通知中引用指定的切入点; 这看起来如下
+```
+@Pointcut("com.xyz.myapp.SystemArchitecture.dataAccessOperation() && args(account,..)")
+private void accountDataAccessOperation(Account account) {}
 
+@Before("accountDataAccessOperation(account)")
+public void validateAccount(Account account) {
+    // ...
+}
+```
+感兴趣的读者再次参考 AspectJ 编程指南以获取更多详细信息  
+代理对象 (this), 目标对象 (target) 和注解 (`@within, @target, @annotation, @args`) 都可以以类似的方式绑定; 以下示例显示了如何匹配使用 `@Auditable` 注解注释的方法的执行, 并提取审计代码  
+首先定义 `@Auditable` 注解
+```
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface Auditable {
+    AuditCode value();
+}
+```
+然后是执行与 `@Auditable` 注解的方法相匹配的通知
+```
+@Before("com.xyz.lib.Pointcuts.anyPublicMethod() && @annotation(auditable)")
+public void audit(Auditable auditable) {
+    AuditCode code = auditable.value();
+    // ...
+}
+```
+##### 通知参数和泛型
+Spring AOP 可以处理类声明和方法参数中使用的泛型; 假设你有这样的泛型类型
+```
+public interface Sample<T> {
+    void sampleGenericMethod(T param);
+    void sampleGenericCollectionMethod(Collection<T> param);
+}
+```
+你可以通过在你要拦截方法的参数类型中键入通知参数, 将方法类型的拦截限制为某些参数类型
+```
+@Before("execution(* ..Sample+.sampleGenericMethod(*)) && args(param)")
+public void beforeSampleMethod(MyType param) {
+    // Advice implementation
+}
+```
+正如我们上面已经讨论的那样, 这很有效; 但是值得指出的是, 这不适用于通用集合; 所以你不能定义像这样的切入点
+```
+@Before("execution(* ..Sample+.sampleGenericCollectionMethod(*)) && args(param)")
+public void beforeSampleMethod(Collection<MyType> param) {
+    // Advice implementation
+}
+```
+为了完成这项工作, 我们必须检查集合的每个元素, 这是不合理的, 因为我们也无法决定如何一般地处理空值; 要实现与此类似的操作, 你必须将参数键入 `Collection<?>` 并手动检查元素的类型
+
+##### 确定参数名称
+通知调用中的参数绑定依赖于切入点表达式中使用的匹配名称与 (通知和切入点) 方法签名中声明的参数名称; 参数名称不能通过 Java 反射获得, 因此 Spring AOP 使用以下策略来确定参数名称
+- 如果用户明确指定了参数名称, 则使用指定的参数名称: 通知和切入点注解都有一个可选的 "argNames" 属性, 可用于指定带注解的方法的参数名称 --- 这些参数名称在运行时可用; 例如
+```
+@Before(value="com.xyz.lib.Pointcuts.anyPublicMethod() && target(bean) && @annotation(auditable)",
+        argNames="bean,auditable")
+public void audit(Object bean, Auditable auditable) {
+    AuditCode code = auditable.value();
+    // ... use code and bean
+}
+```
+如果第一个参数是 `JoinPoint, ProceedingJoinPoint, JoinPoint.StaticPart` 类型, 则可以从 "argNames" 属性的值中省略参数的名称; 例如, 如果修改前面的通知以接收连接点对象, 则 "argNames" 属性不需要包含它
+```
+@Before(value="com.xyz.lib.Pointcuts.anyPublicMethod() && target(bean) && @annotation(auditable)",
+        argNames="bean,auditable")
+public void audit(JoinPoint jp, Object bean, Auditable auditable) {
+    AuditCode code = auditable.value();
+    // ... use code, bean, and jp
+}
+```
+对 `JoinPoint, ProceedingJoinPoint, JoinPoint.StaticPart` 类型的第一个参数进行的特殊处理对于不收集任何其他连接点上下文的通知特别方便; 在这种情况下, 你可以简单地省略 "argNames" 属性; 例如, 以下通知无需声明 "argNames" 属性
+```
+@Before("com.xyz.lib.Pointcuts.anyPublicMethod()")
+public void audit(JoinPoint jp) {
+    // ... use jp
+}
+```
+- 使用 "argNames" 属性有点笨拙, 所以如果没有指定 "argNames" 属性, 那么 Spring AOP 将查看该类的调试信息, 并尝试从局部变量表中确定参数名称; 只要已使用调试信息 (至少为 "-g:vars") 编译类, 此信息就会出现; 使用此标志进行编译的后果是: (1) 你的代码将更容易理解 (逆向工程),(2) 类文件大小将略微更大 (通常无关紧要), (3) 要删除的优化, 编译器不会应用未使用的局部变量; 换句话说, 使用此标志构建时不会遇到任何困难
+>如果在没有调试信息的情况下由 AspectJ 编译器 (ajc) 编译了 `@AspectJ` 切面, 那么就不需要添加 "argNames" 属性, 因为编译器将保留所需的信息
+
+- 如果代码编译时没有必要的调试信息, 那么 Spring AOP 将尝试推断绑定变量与参数的配对 (例如, 如果在切入点表达式中只绑定了一个变量, 并且通知方法只接受一个参数, 配对很明显!); 如果给定可用信息, 变量的绑定是不明确的, 那么将抛出 `AmbiguousBindingException`
+- 如果上述所有策略都失败, 则抛出 `IllegalArgumentException`
+
+##### 带参处理
+我们之前讨论过, 我们将描述如何使用在 Spring AOP 和 AspectJ 中一致工作的参数编写一个继续调用; 解决方案只是确保建议签名按顺序绑定每个方法参数; 例如
+```
+@Around("execution(List<Account> find*(..)) && " +
+        "com.xyz.myapp.SystemArchitecture.inDataAccessLayer() && " +
+        "args(accountHolderNamePattern)")
+public Object preProcessQueryPattern(ProceedingJoinPoint pjp,
+        String accountHolderNamePattern) throws Throwable {
+    String newPattern = preProcess(accountHolderNamePattern);
+    return pjp.proceed(new Object[] {newPattern});
+}
+```
+在许多情况下, 无论如何你都会做这个绑定 (如上例所示)
+
+##### 通知顺序
+当多条通知都匹配在同一个连接点运行时会发生什么? Spring AOP 遵循与 AspectJ 相同的优先级规则来确定通知执行的顺序; 最高优先级的入口通知首先运行 (所以给出两条前置通知, 优先级最高的建议先运行); 从连接点后口, 最高优先级通知最后运行 (因此给出两条后置通知, 具有最高优先级的通知后续运行)  
+当在不同切面定义的两条通知都需要在同一个连接点运行时, 除非你另行指定, 否则执行顺序是未定义的; 你可以通过指定优先级来控制执行顺序; 这是通过在方法类中实现 `org.springframework.core.Ordered` 接口或使用 `Order` 注解对其进行注解来以常规 Spring 方式完成的; 给定两个切面, 从 `Ordered.getValue()` (或注释值) 返回较低值的方面具有较高的优先级  
+当在同一切面定义的两条通知都需要在同一个连接点上运行时, 排序是未定义的 (因为没有办法通过反射为 javac 编译的类检索声明顺序); 考虑将这些通知方法折叠到每个切面类中每个连接点的一个tongzhi 方法中, 或者将这些通知重构为单独的切面类 ---- 可以在切面级别进行排序
+
+#### 引言
+引言 (在 AspectJ 中称为类型间声明) 使切面能够声明通知对象实现给定接口, 并代表这些对象提供该接口的实现  
+使用 `@DeclareParents` 注解进行了引言; 此注解用于声明匹配类型具有新父级 (因此名称); 例如, 给定一个接口 `UsageTracked`, 以及该接口 `DefaultUsageTracked` 的实现, 以下方面声明服务接口的所有实现者也实现 `UsageTracked` 接口; (例如, 为了通过 JMX 公开统计信息)
+```
+@Aspect
+public class UsageTracking {
+
+    @DeclareParents(value="com.xzy.myapp.service.*+", defaultImpl=DefaultUsageTracked.class)
+    public static UsageTracked mixin;
+
+    @Before("com.xyz.myapp.SystemArchitecture.businessService() && this(usageTracked)")
+    public void recordUsage(UsageTracked usageTracked) {
+        usageTracked.incrementUseCount();
+    }
+
+}
+```
+要实现的接口由注解字段的类型确定; `@DeclareParents` 注解的 `value` 属性是一个 AspectJ 类型模式: --- 任何匹配类型的 bean 都将实现 `UsageTracked` 接口; 请注意在上面示例的前置通知中, 服务 bean 可以直接用作 `UsageTracked` 接口的实现; 如果以编程方式访问 bean, 你将编写以下内容
+```
+UsageTracked usageTracked = (UsageTracked) context.getBean("myService");
+```
+
+#### 切面实例化模型
+>这是一个高级主题, 因此如果你刚开始使用 AOPm, 可以安全地跳过它
+
+默认情况下, 应用程序上下文中的每个切面都有一个实例; AspectJ 将其称为单例实例化模型; 可以使用备用生命周期定义切面: --- Spring 支持 AspectJ 的 `perthis` 和 `pertarget` 实例化模型 (目前不支持 `percflowm, percflowbelow, pertypewithin`)    
+通过在 `@Aspect` 注解中指定 `perthis` 子句来声明 "perthis" 切面; 让我们看一个例子, 然后我们将解释它是如何工作的
+```
+@Aspect("perthis(com.xyz.myapp.SystemArchitecture.businessService())")
+public class MyAspect {
+
+    private int someState;
+
+    @Before(com.xyz.myapp.SystemArchitecture.businessService())
+    public void recordServiceUsage() {
+        // ...
+    }
+
+}
+```
+"perthis" 子句的作用是将为执行业务服务的每个唯一服务对象创建一个切面实例 (每个唯一对象在由切入点表达式匹配的连接点处绑定到 "this"); 方法实例是在第一次在服务对象上调用方法时创建的, 当服务对象超出范围时, 该切面超出范围; 在创建切面实例之前, 其中没有任何建议执行; 一旦创建了切面实例, 在其中声明的通知将在匹配的连接点处执行, 但仅在服务对象是与此方面相关联的服务对象时执行; 有关 per 子句的更多信息请参阅 AspectJ 编程指南  
+"pertarget" 实例化模型的工作方式与 "perthis" 完全相同, 但在匹配的连接点为每个唯一目标对象创建一个切面实例
+
+#### 示例
+既然你已经看到了所有组成部分的工作方式, 那就让我们把它们放在一起做一些有用的事情吧!  
+由于并发问题 (例如死锁失败者), 业务服务的执行有时可能会失败; 如果重试该操作, 下次很可能成功; 对于适合在这种情况下重试的业务服务 (不需要返回给用户进行冲突解决的幂等操作), 我们希望透明地重试该操作以避免客户端看到 `PessimisticLockingFailureException`; 这是明确跨越服务层中的多个服务的要求, 因此是通过切面实现的理想选择  
+因为我们想要重试操作, 所以我们需要使用环绕通知, 以便我们可以多次调用 `proceed`; 以下是基本切面的实现
+```
+@Aspect
+public class ConcurrentOperationExecutor implements Ordered {
+
+    private static final int DEFAULT_MAX_RETRIES = 2;
+
+    private int maxRetries = DEFAULT_MAX_RETRIES;
+    private int order = 1;
+
+    public void setMaxRetries(int maxRetries) {
+        this.maxRetries = maxRetries;
+    }
+
+    public int getOrder() {
+        return this.order;
+    }
+
+    public void setOrder(int order) {
+        this.order = order;
+    }
+
+    @Around("com.xyz.myapp.SystemArchitecture.businessService()")
+    public Object doConcurrentOperation(ProceedingJoinPoint pjp) throws Throwable {
+        int numAttempts = 0;
+        PessimisticLockingFailureException lockFailureException;
+        do {
+            numAttempts++;
+            try {
+                return pjp.proceed();
+            }
+            catch(PessimisticLockingFailureException ex) {
+                lockFailureException = ex;
+            }
+        } while(numAttempts <= this.maxRetries);
+        throw lockFailureException;
+    }
+
+}
+```
+请注意, 该切面实现了 `Ordered` 接口, 因此我们可以将切面的优先级设置为高于事务通知 (我们每次重试时都需要一个新的事务); `maxRetries` 和 `order` 属性都将由 Spring 配置; 主要操作发生在 `doConcurrentOperation` 的环绕通过中; 请注意, 目前我们正在将重试逻辑应用于所有 `businessService()`;如果我们因为 `PessimisticLockingFailureException` 失败了将继续尝试, 我们只需再试一次, 除非我们已经用尽所有的重试尝试  
+对应的 Spring 如下
+```
+<aop:aspectj-autoproxy/>
+
+<bean id="concurrentOperationExecutor" class="com.xyz.myapp.service.impl.ConcurrentOperationExecutor">
+    <property name="maxRetries" value="3"/>
+    <property name="order" value="100"/>
+</bean>
+```
+为了优化切面以便它只重试幂等操作, 我们可以定义一个 `Idempotent` 注解
+```
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Idempotent {
+    // marker annotation
+}
+```
+并使用注解来注释服务操作的实现; 对切面的更改仅重试幂等操作只涉及改进切入点表达式, 以便只有 `@Idempotent` 操作匹配
+```
+@Around("com.xyz.myapp.SystemArchitecture.businessService() && " +
+        "@annotation(com.xyz.myapp.service.Idempotent)")
+public Object doConcurrentOperation(ProceedingJoinPoint pjp) throws Throwable {
+    ...
+}
+```
 
 >**参考:**
 [@AspectJ support](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj)
