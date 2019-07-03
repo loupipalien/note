@@ -227,6 +227,119 @@ public Object doBasicProfiling(ProceedingJoinPoint pjp) throws Throwable {
 }
 ```
 
+##### 通知参数
+基于模式的声明样式支持完全类型化的通知, 方法与 `@AspectJ` 支持描述的方式相同 --- 通过名称匹配切入点参数和通知方法参数; 有关详细信息, 请参阅 ["通知参数"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj-advice-params) 一节; 如果你希望显式指定通知方法的参数名称 (不依赖于前面描述的检测策略), 那么这是使用 `advice` 元素的 `arg-names` 属性完成的, 该属性与在通知注解中的 "argNames" 属性的处理方式相同; 如 ["确定参数名称"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj-advice-params-names) 一节中所述; 例如：
+```
+<aop:before
+    pointcut="com.xyz.lib.Pointcuts.anyPublicMethod() and @annotation(auditable)"
+    method="audit"
+    arg-names="auditable"/>
+```
+`arg-names` 属性接受以逗号分隔的参数名称列表  
+下面是一个基于 XSD 的方法的一个稍微复杂的例子, 它说明了与一些强类型参数一起使用的一些通知
+```
+package x.y.service;
+
+public interface FooService {
+
+    Foo getFoo(String fooName, int age);
+}
+
+public class DefaultFooService implements FooService {
+
+    public Foo getFoo(String name, int age) {
+        return new Foo(name, age);
+    }
+}
+```
+接下来是切面; 请注意, `profile(..)` 方法接受许多强类型参数, 第一个参数恰好是用于继续方法调用的连接点: 此参数的存在表示 `profile(..)` 用作环绕通知
+```
+package x.y;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.springframework.util.StopWatch;
+
+public class SimpleProfiler {
+
+    public Object profile(ProceedingJoinPoint call, String name, int age) throws Throwable {
+        StopWatch clock = new StopWatch("Profiling for '" + name + "' and '" + age + "'");
+        try {
+            clock.start(call.toShortString());
+            return call.proceed();
+        } finally {
+            clock.stop();
+            System.out.println(clock.prettyPrint());
+        }
+    }
+}
+```
+最后, 这是为特定连接点执行上述通知所需的 XML 配置:
+```
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- this is the object that will be proxied by Spring's AOP infrastructure -->
+    <bean id="fooService" class="x.y.service.DefaultFooService"/>
+
+    <!-- this is the actual advice itself -->
+    <bean id="profiler" class="x.y.SimpleProfiler"/>
+
+    <aop:config>
+        <aop:aspect ref="profiler">
+
+            <aop:pointcut id="theExecutionOfSomeFooServiceMethod"
+                expression="execution(* x.y.service.FooService.getFoo(String,int))
+                and args(name, age)"/>
+
+            <aop:around pointcut-ref="theExecutionOfSomeFooServiceMethod"
+                method="profile"/>
+
+        </aop:aspect>
+    </aop:config>
+
+</beans>
+```
+如果我们有以下驱动程序脚本, 我们将在标准输出上获得类似的输出
+```
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+import x.y.service.FooService;
+
+public final class Boot {
+
+    public static void main(final String[] args) throws Exception {
+        BeanFactory ctx = new ClassPathXmlApplicationContext("x/y/plain.xml");
+        FooService foo = (FooService) ctx.getBean("fooService");
+        foo.getFoo("Pengo", 12);
+    }
+}
+```
+```
+StopWatch 'Profiling for 'Pengo' and '12'': running time (millis) = 0
+-----------------------------------------
+ms     %     Task name
+-----------------------------------------
+00000  ?  execution(getFoo)
+```
+
+##### 通知顺序
+当多个通知需要在同一个连接点 (执行方法) 执行时, 排序规则如 ["通知排序"](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-ataspectj-advice-ordering) 一节中所述; 切面之间的优先级是通过将 `Order` 注解添加到支持切面的 bean 或通过让 bean 实现 `Ordered` 接口来确定的  
+
+#### 引言
+TODO
+
+#### 切面实例化模型
+模式定义方面唯一支持的实例化模型是单例模型, 未来的版本可能支持其他实例化模型
+
+#### 通知器
+TODO
+
+#### 示例
+TODO
 
 >**参考:**  
 [Schema-based AOP support](https://docs.spring.io/spring/docs/4.3.24.RELEASE/spring-framework-reference/html/aop.html#aop-schema)
