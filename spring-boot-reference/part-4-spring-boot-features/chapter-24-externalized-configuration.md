@@ -171,6 +171,22 @@ public class Config {
 `YamlPropertySourceLoader` 类可用于在 Spring 环境中将 YAML 暴露为 `PropertySource`; 这样做可以使用带占位符语法的 `@Value` 注解来访问 YAML 属性
 
 ##### 多档案的 YAML 文件
+你可以使用 `spring.profiles` 键在单个文件中指定多个特定于配置文件的 YAML 文档, 以指示文档何时应用, 如以下所示
+```
+server:
+	address: 192.168.1.100
+---
+spring:
+	profiles: development
+server:
+	address: 127.0.0.1
+---
+spring:
+	profiles: production & eu-central
+server:
+	address: 192.168.1.120
+```
+在以上示例中, 如果 `development` 配置文件处于活动状态, 则 `server.address` 属性为 `127.0.0.1`; 同样, 如果 `production` 和 `eu-central` 配置文件处于活动状态, 则 `server.address` 属性为 `192.168.1.120`; 如果未启用 `development`,  `production` 和 `eu-central` 配置文件, 则该属性的值为 `192.168.1.100`
 
 >**参考:**  
 [Externalized Configuration](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config)
