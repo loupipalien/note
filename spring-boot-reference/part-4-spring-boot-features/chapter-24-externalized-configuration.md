@@ -187,6 +187,106 @@ server:
 	address: 192.168.1.120
 ```
 在以上示例中, 如果 `development` 配置文件处于活动状态, 则 `server.address` 属性为 `127.0.0.1`; 同样, 如果 `production` 和 `eu-central` 配置文件处于活动状态, 则 `server.address` 属性为 `192.168.1.120`; 如果未启用 `development`,  `production` 和 `eu-central` 配置文件, 则该属性的值为 `192.168.1.100`
+>因此, `spring.profiles` 可以包含简单的配置文件名称 (例如 production) 或配置文件表达式; 配置文件表达式允许表达更复杂的逻辑, 例如 production & (eu-central | eu-west); 详见 [参考指南](https://docs.spring.io/spring/docs/5.1.8.RELEASE/spring-framework-reference/core.html#beans-definition-profiles-java)
+
+如果在应用程序上下文启动时没有显式激活, 则激活默认配置文件; 因此, 在以下 YAML 中, 我们为 `spring.security.user.password` 设置了一个值, 该值仅在 "default" 配置文件中可用:
+```
+server:
+  port: 8000
+---
+spring:
+  profiles: default
+  security:
+    user:
+      password: weak
+```
+然而在以下示例中, 因为它未附加到任何配置文件则会始终设置密码, 并且必须在必要时在所有其他配置文件中显式重置密码
+```
+server:
+  port: 8000
+spring:
+  security:
+    user:
+      password: weak
+```
+使用 `spring.profiles` 元素指定的配置文件可以通过使用 `!` 字符选择; 如果为单个文档指定了否定和非否定的配置文件, 则至少一个非否定的配置文件必须匹配, 并且没有否定的配置文件可匹配
+
+##### YAML 的缺点
+无法使用 `@PropertySource` 注解加载 YAML 文件; 因此如果你需要以这种方式加载值, 则需要使用 Properties 文件  
+在特定于配置文件的 YAML 文件中使用多个 YAML 文档语法可能会导致意外行为; 例如, 在名为 `application-dev.yml` 的文件中考虑以下配置, 其中 dev 配置文件处于活动状态
+```
+server:
+  port: 8000
+---
+spring:
+  profiles: !test
+  security:
+    user:
+      password: weak
+```
+在上面的示例中, 配置文件否定和配置文件表达式将不会按预期运行; 我们建议你不要将特定于配置文件的 YAML 文件和多个 YAML 文档组合在一起, 并坚持只使用其中一个
+
+#### 类型安全的配置属性
+使用 `@Value("${property}")` 注释来注入配置属性有时会很麻烦, 特别是如果你使用多个属性或者你的数据本质上是分层的; Spring Boot 提供了一种使用 Properties 的替代方法, 允许强类型 bean 管理和验证应用程序的配置, 如以下示例所示:
+```
+package com.example;
+
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties("acme")
+public class AcmeProperties {
+
+	private boolean enabled;
+
+	private InetAddress remoteAddress;
+
+	private final Security security = new Security();
+
+	public boolean isEnabled() { ... }
+
+	public void setEnabled(boolean enabled) { ... }
+
+	public InetAddress getRemoteAddress() { ... }
+
+	public void setRemoteAddress(InetAddress remoteAddress) { ... }
+
+	public Security getSecurity() { ... }
+
+	public static class Security {
+
+		private String username;
+
+		private String password;
+
+		private List<String> roles = new ArrayList<>(Collections.singleton("USER"));
+
+		public String getUsername() { ... }
+
+		public void setUsername(String username) { ... }
+
+		public String getPassword() { ... }
+
+		public void setPassword(String password) { ... }
+
+		public List<String> getRoles() { ... }
+
+		public void setRoles(List<String> roles) { ... }
+
+	}
+}
+```
+前面的 POJO 定义了以下属性:
+- `acme.enabled`, 默认情况下值为 `false`
+- `acme.remote-address`, 具有可以从 `String` 强制转换的类型
+- `acme.security.username`, 使用嵌套的 "security" 对象, 其名称由属性名称确定; 注意这里返回类型根本没有使用, 而是 `SecurityProperties`
+- acme.security.password
+- acme.security.roles, `String` 的一个集合
+
 
 >**参考:**  
 [Externalized Configuration](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config)
