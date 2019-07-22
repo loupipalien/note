@@ -284,8 +284,117 @@ public class AcmeProperties {
 - `acme.enabled`, 默认情况下值为 `false`
 - `acme.remote-address`, 具有可以从 `String` 强制转换的类型
 - `acme.security.username`, 使用嵌套的 "security" 对象, 其名称由属性名称确定; 注意这里返回类型根本没有使用, 而是 `SecurityProperties`
-- acme.security.password
-- acme.security.roles, `String` 的一个集合
+- `acme.security.password`
+- `acme.security.roles`, `String` 的一个集合
+
+>getter 和 setter 通常是必需的, 因为绑定是通过标准的 Java Beans 属性描述符, 就像在 Spring MVC 中一样; 在下列情况下可以省略 setter:
+>- 映射, 只要它们被初始化, 就需要一个 getter 但不一定是 setter, 因为它们可以被绑定器变异
+>- 可以通过索引 (通常使用 YAML) 或使用单个逗号分隔值 (属性) 访问集合和数组; 在后一种情况下, 必须设置一个 setter; 我们建议始终为这些类型添加 setter; 如果初始化集合, 请确保它不是不可变的 (如上例所示)
+>- 如果初始化嵌套的 POJO 属性 (如前面示例中的 "security" 字段), 则不需要 setter; 如果希望绑定器使用其默认构造函数动态创建实例, 则需要一个 setter
+有些人使用 Project Lombok 自动添加 getter 和 setter; 确保 Lombok 不为此类型生成任何特定构造函数, 因为容器会自动使用它来实例化对象; 最后仅考虑标准 Java Bean 属性, 并且不支持对静态属性的绑定
+>另请参阅 [`@Value` 和 `@ConfigurationProperties` 之间的差异](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config-vs-value)
+
+你还需要列出要在 `@EnableConfigurationProperties` 注解中注册的属性类, 如以下示例所示
+```
+@Configuration
+@EnableConfigurationProperties(AcmeProperties.class)
+public class MyConfiguration {
+}
+```
+>当以这种方式注册 `@ConfigurationProperties` bean 时, bean具有常规名称: `<prefix>-<fqn>`, 其中 `<prefix>`是 `@ConfigurationProperties` 注解中指定的环境键前缀, `<fqn>`是 bean 的完全限定名称; 如果注解未提供任何前缀, 则仅使用 bean 的完全限定名称
+上例中的 bean 名称是 `acme-com.example.AcmeProperties`
+
+上述配置为 `AcmeProperties` 创建了一个常规 bean; 我们建议 `@ConfigurationProperties` 仅处理环境变量, 特别是不从上下文中注入其他 bean; 请记住 `@EnableConfigurationProperties` 注解也会自动应用于你的项目, 以便从 `Environment` 配置任何使用 `@ConfigurationProperties` 注解的现有 bean; 你可以将 `AcmeProperties` 设为 bean, 而不是使用 `@EnableConfigurationProperties(AcmeProperties.class)` 注解 `MyConfiguration`, 如以下示例所示
+```
+@Component
+@ConfigurationProperties(prefix="acme")
+public class AcmeProperties {
+
+	// ... see the preceding example
+
+}
+```
+这种配置方式特别适用于 `SpringApplication` 外部化 YAML 配置, 如以下示例所示
+```
+# application.yml
+
+acme:
+	remote-address: 192.168.1.1
+	security:
+		username: admin
+		roles:
+		  - USER
+		  - ADMIN
+
+# additional configuration as required
+```
+要使用 `@ConfigurationProperties` bean, 你可以与任何其他 bean 相同的方式注入它们, 如以下示例所示
+```
+@Service
+public class MyService {
+
+	private final AcmeProperties properties;
+
+	@Autowired
+	public MyService(AcmeProperties properties) {
+	    this.properties = properties;
+	}
+
+ 	//...
+
+	@PostConstruct
+	public void openConnection() {
+		Server server = new Server(this.properties.getRemoteAddress());
+		// ...
+	}
+
+}
+```
+>使用 `@ConfigurationProperties` 还可以生成元数据文件, IDE 可以使用这些文件为你自己的密钥提供自动完成功能; 详见 [附录 B, 配置元数据](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/configuration-metadata.html) 附录
+
+##### 第三方配置
+除了使用 `@ConfigurationProperties` 注解类之外, 您还可以在公共 `@Bean` 方法上使用它; 当你想要将属性绑定到控件之外的第三方组件时, 这样做会特别有用  
+要从 `Environment` 属性配置 bean, 请将 `@ConfigurationProperties` 添加到其 bean 注册中, 如以下示例所示
+```
+@ConfigurationProperties(prefix = "another")
+@Bean
+public AnotherComponent anotherComponent() {
+	...
+}
+```
+使用 `another` 前缀定义的任何属性都以与前面的 `AcmeProperties` 示例类似的方式映射到该 `AnotherComponent` bean
+
+##### 宽松绑定
+Spring Boot 使用一些宽松的规则将 `Environment` 属性绑定到 `@ConfigurationProperties` bean, 因此不需要在 `Environment` 属性名和 bean 属性名之间进行精确匹配; 这有用的常见示例包括破折号分隔的环境属性 (例如, `context-path` 绑定到 `contextPath`) 和大写环境属性（例如, PORT 绑定到 `port`)  
+例如, 请考虑以下 `@ConfigurationProperties` 类
+```
+@ConfigurationProperties(prefix="acme.my-project.person")
+public class OwnerProperties {
+
+	private String firstName;
+
+	public String getFirstName() {
+		return this.firstName;
+	}
+
+	public void setFirstName(String firstName) {
+		this.firstName = firstName;
+	}
+
+}
+```
+在前面的示例中, 可以使用以下属性名称:
+
+| 属性 | 解释 |
+| :--- | :--- |
+| acme.my-project.person.first-name | Kebab 示例, 建议在 .properties 和 .yml 文件中使用 |
+| acme.my-project.person.firstName | 标准的驼峰语法 |
+| acme.my-project.person.first_name | 下划线表示法, 它是在 .properties 和 .yml 文件中使用的替代格式 |
+| ACME_MYPROJECT_PERSON_FIRSTNAME | 大写格式, 使用系统环境变量时建议使用 |
+
+>注解的前缀值必须是 kebab 示例 (小写并用 - 分隔, 例如 `acme.my-project.person`)
+
+
 
 
 >**参考:**  
