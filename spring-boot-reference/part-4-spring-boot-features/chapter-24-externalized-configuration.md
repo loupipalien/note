@@ -394,8 +394,107 @@ public class OwnerProperties {
 
 >注解的前缀值必须是 kebab 示例 (小写并用 - 分隔, 例如 `acme.my-project.person`)
 
+| 属性源 | 示例 | 列表 |
+| :--- | :--- |
+| properties 文件 | 驼峰格式, 烤串格式, 下划线格式 | 标准列表语法使用 [] 或逗号分隔值 |
+| YAML 文件 | 	
+驼峰格式, 烤串格式, 下划线格式 | 标准 YAML 列表语法或逗号分隔值 |
+| 环境变量 | 大写格式, 下划线作为分隔符; `_` 不应在属性名称中使用 |
+| 系统变量 | 驼峰格式, 烤串格式, 下划线格式 | 标准列表语法使用 [] 或逗号分隔值 |
 
+>我们建议, 在可能的情况下, 属性以小写的烤串格式存储, 例如 `my.property-name = acme`
 
+绑定到 `Map` 属性时, 如果键包含除小写字母数字字符以外的任何内容或 `-`, 则需要使用括号表示法以保留原始值; 如果键未被 `[]` 包围, 则删除任何非字母数字或字符的字符; 例如, 考虑将以下属性绑定到 `Map`
+```
+acme:
+  map:
+    "[/key1]": value1
+    "[/key2]": value2
+    /key3: value3
+```
+上面的属性将绑定到带有 `/key1`, `/key2` 和 `key3` 作为 `Map` 的中的键
+
+##### 合并复杂类型
+当列表在多个位置配置时, 覆盖通过替换整个列表来工作;  
+例如, 假设具有名称和描述属性的 `MyPojo` 对象默认为 `null`; 以下示例公开了 `AcmeProperties` 中的 `MyPojo` 对象列表
+```
+@ConfigurationProperties("acme")
+public class AcmeProperties {
+
+	private final List<MyPojo> list = new ArrayList<>();
+
+	public List<MyPojo> getList() {
+		return this.list;
+	}
+
+}
+```
+配置如下
+```
+acme:
+  list:
+    - name: my name
+      description: my description
+---
+spring:
+  profiles: dev
+acme:
+  list:
+    - name: my another name
+```
+如果 `dev` 配置文件未激活, 则 `AcmeProperties.list` 包含一个 `MyPojo` 条目, 如先前定义的那样; 但是, 如果启用了 `dev` 配置文件, 则列表仍然只包含一个条目 (naem 为 `my another name` 和 description 为 `null`); 此配置不会向列表中添加第二个 `MyPojo` 实例, 也不会合并条目  
+在多个配置文件中指定 `List` 时, 将使用具有最高优先级 (并且只有该一个) 的列表; 请考虑以下示例
+```
+acme:
+  list:
+    - name: my name
+      description: my description
+    - name: another name
+      description: another description
+---
+spring:
+  profiles: dev
+acme:
+  list:
+    - name: my another name
+```
+在前面的示例中, 如果 `dev` 配置文件处于活动状态, 则 `AcmeProperties.list` 包含一个 `MyPojo` 条目 (naem 为 `my another name` 和 description 为 `null`); 对于 `YAML`, 逗号分隔列表和 YAML 列表都可用于完全覆盖列表的内容  
+对于 `Map` 属性, 你可以绑定从多个源中提取的属性值; 但是, 对于多个源中的相同属性, 使用具有最高优先级的属性; 以下示例从 `AcmeProperties` 公开 `Map<String，MyPojo>`
+```
+@ConfigurationProperties("acme")
+public class AcmeProperties {
+
+	private final Map<String, MyPojo> map = new HashMap<>();
+
+	public Map<String, MyPojo> getMap() {
+		return this.map;
+	}
+
+}
+```
+配置如下
+```
+acme:
+  map:
+    key1:
+      name: my name 1
+      description: my description 1
+---
+spring:
+  profiles: dev
+acme:
+  map:
+    key1:
+      name: dev name 1
+    key2:
+      name: dev name 2
+      description: dev description 2
+```
+如果 `dev` 配置文件未激活, 则 `AcmeProperties.map` 包含一个带键 `key1` 的条目 (name 为 `1`, description 为 `my description 1`); 但是, 如果启用了 `dev` 配置文件, 则 `map` 包含两个条目, 其中键 `key1` (名为 `dev name 1` 和 description 为 `dev description 2`) 和 key2 (name 为 `dev name 2` 和 description 为 `dev description 2`)
+
+>前面的合并规则适用于所有属性源的属性, 而不仅仅适用于 YAML 文件
+
+##### 属性转换
 
 >**参考:**  
 [Externalized Configuration](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config)
