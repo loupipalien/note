@@ -495,6 +495,125 @@ acme:
 >前面的合并规则适用于所有属性源的属性, 而不仅仅适用于 YAML 文件
 
 ##### 属性转换
+当 Spring 绑定到 `@ConfigurationProperties` bean 时, Spring Boot 会尝试将外部应用程序属性强制转换为正确的类型; 如果需要自定义类型转换, 则可以提供 `ConversionService` bean (带有名为 `conversionService` 的 bean) 或自定义属性编辑器 (通过 `CustomEditorConfigurer` bean) 或自定义转换器 (带有注解为 `@ConfigurationPropertiesBinding` 的 bean 定义)  
+由于在应用程序生命周期中很早就请求了此 bean, 因此请确保限制 `ConversionService` 正在使用的依赖项; 通常, 你在创建时可能无法完全初始化所需的任何依赖项; 如果配置键强制不需要, 你可能希望重命名自定义 `ConversionService`, 并且只依赖于使用 `@ConfigurationPropertiesBinding` 限定的自定义转换器  
 
+###### 转换持续时间
+Spring Boot 专门支持表达持续时间; 如果公开 `java.time.Duration` 属性, 则可以使用应用程序属性中的以下格式
+- 常规 `Long` 类型表示 (除非指定了 `@DurationUnit`, 否则使用毫秒作为默认单位)
+- `java.time.Duration` 使用的标准 ISO-8601 格式
+- 一种更易读的格式, 其中值和单位耦合 (例如 10s 表示 10 秒)
+
+考虑以下示例
+```
+@ConfigurationProperties("app.system")
+public class AppSystemProperties {
+
+	@DurationUnit(ChronoUnit.SECONDS)
+	private Duration sessionTimeout = Duration.ofSeconds(30);
+
+	private Duration readTimeout = Duration.ofMillis(1000);
+
+	public Duration getSessionTimeout() {
+		return this.sessionTimeout;
+	}
+
+	public void setSessionTimeout(Duration sessionTimeout) {
+		this.sessionTimeout = sessionTimeout;
+	}
+
+	public Duration getReadTimeout() {
+		return this.readTimeout;
+	}
+
+	public void setReadTimeout(Duration readTimeout) {
+		this.readTimeout = readTimeout;
+	}
+
+}
+```
+要指定会话超时 30 秒, 30, PT30S 和 30s 都是等效的; 读取超时为 500ms 可以采用以下任何一种形式指定: 500, PT0.5S 和 500ms  
+也可以使用任何支持的单位:
+- `ns` 纳秒
+- `us` 微秒
+- `ms` 毫秒
+- `s` 秒
+- `m` 分钟
+- `h` 小时
+- `d` 天
+
+默认单位是毫秒, 可以使用 `@DurationUnit`覆盖, 如上面的示例所示
+>如果要从仅使用 `Long` 表示持续时间的先前版本升级, 请确保定义单位 (使用 `@DurationUnit`), 如果它不是切换到持续时间旁边的毫秒; 这样做可以提供透明的升级路径, 同时支持更丰富的格式
+
+####### 转换数据大小
+Spring Framework 有一个 `DataSize` 值类型, 允许以字节为单位表示大小; 如果公开 `DataSize` 属性, 则可以使用应用程序属性中的以下格式
+- 常规 `Long` 类型表示 (使用字节作为默认单位, 除非指定了 `@DataSizeUnit`)
+- 一种更易读的格式, 其中值和单元耦合 (例如 10MB 表示 10 兆字节)
+
+要指定 10 兆字节的缓冲区大小, 10 和 10MB 是等效的; 可以将 256 字节的大小阈值指定为 256 或 256B  
+也可以使用任何支持的单位
+- `B` 字节
+- `KB` 千字节
+- `MB` 兆字节
+- `GB` 千兆字节
+- `TB` 兆兆字节
+
+默认单位是字节, 可以使用 `@DataSizeUnit` 覆盖, 如上面的示例所示
+>如果要从仅使用 `Long` 表示大小的先前版本进行升级, 请确保定义单元 (使用 `@DataSizeUnit`), 如果它不是切换到 `DataSize` 旁边的字节; 这样做可以提供透明的升级路径, 同时支持更丰富的格式
+
+##### @ConfigurationProperties 校验
+只要使用 Spring 的 `@Validated` 注解注释, Spring Boot 就会尝试验证 `@ConfigurationProperties` 类; 你可以直接在配置类上使用 JSR-303 的 `javax.validation`注释约束; 为此请确保符合条件的 JSR-303 实现在你的类路径上, 然后向字段添加注释约束, 如以下示例所示
+```
+@ConfigurationProperties(prefix="acme")
+@Validated
+public class AcmeProperties {
+
+	@NotNull
+	private InetAddress remoteAddress;
+
+	// ... getters and setters
+
+}
+```
+>你还可以通过注解使用 `@Validated` 创建配置属性的 `@Bean` 方法来触发验证
+
+尽管绑定时也会验证嵌套属性, 但最好还是将关联字段注释为 `@Valid`; 这确保即使未找到嵌套属性也会触发验证; 以下示例基于前面的 `AcmeProperties` 示例构建
+```
+@ConfigurationProperties(prefix="acme")
+@Validated
+public class AcmeProperties {
+
+	@NotNull
+	private InetAddress remoteAddress;
+
+	@Valid
+	private final Security security = new Security();
+
+	// ... getters and setters
+
+	public static class Security {
+
+		@NotEmpty
+		public String username;
+
+		// ... getters and setters
+
+	}
+}
+```
+你还可以通过创建名为 `configurationPropertiesValidator` 的 bean 定义来添加自定义 Spring Validator; 应该将 `@Bean` 方法声明为 static; 配置属性验证器是在应用程序生命周期的早期创建的, 并且将 `@Bean` 方法声明为 static 可以创建 bean 而无需实例化 `@Configuration` 类; 这样做可以避免早期实例化可能导致的任何问题; 有一个属性验证示例, 显示如何设置
+>`spring-boot-actuator` 模块包括一个暴露所有 `@ConfigurationProperties` bean的端点; 将 Web 浏览器指向 `/actuator/ configprops` 或使用等效的 JMX 端点; 详见 ["生产就绪功能"](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/production-ready-endpoints.html) 章节
+
+##### @ConfigurationProperties vs @Value
+`@Value` 注解是核心容器功能, 它不提供与类型安全配置属性相同的功能; 下表总结了 `@ConfigurationProperties` 和 `@Value` 支持的功能
+
+| 功能 | @ConfigurationProperties | @Value |
+| :--- | :--- | :--- |
+| Relaxed binding | YES | NO |
+| Meta-data support | YES | NO |
+| SpEL 表达式 | NO | YES |
+
+如果为组件定义一组配置键, 建议使用 `@ConfigurationProperties` 注解将它们分组到 POJO 中; 你还应该知道, 因为 `@Value` 不支持宽松绑定, 所以如果你需要使用环境变量来提供值, 则它不是一个好的候选者  
+最后, 虽然你可以在 `@Value` 中编写SpEL表达式, 但不会从应用程序属性文件处理此类表达式
 >**参考:**  
 [Externalized Configuration](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config)
