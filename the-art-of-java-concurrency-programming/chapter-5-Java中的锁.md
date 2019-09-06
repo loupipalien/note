@@ -299,3 +299,216 @@ public final boolean release(int arg) {
 独占式同步状态获取和释放过程总结: 在获取同步状态时, 同步其维护一个同步队列, 获取状态失败的线程都会被加入到队列中进行自旋; 移出队列 (或停止自旋) 的前提是前驱节点为头节点且成功获取了同步状态; 在释放同步队列时, 同步器调用 `tryRelease(int arg)` 方法释放同步状态, 然后唤醒头节点的后继节点
 
 ###### 共享式同步状态获取与释放
+共享式获取与独占式获取最主要的区别在于同一时刻能否有多个线程同时获取到同步状态; 下图为共享式与独占式访问资源的对比
+```
+      ------                   -------
+ 共享 |     |              独占 |     |
+------>     |             ------>    |
+ 共享 |     |              共享 |     |
+------>     |             ---->|     |
+ 共享 | 资源|              共享 | 资源 |
+------>     |             ---=>|     |
+ 独占 |     |              共享 |     |
+---->|     |              ---->|     |
+     -------                   ------
+```
+左半部分, 共享式访问资源时, 其他共享式的访问均被允许; 而独占式访问被阻塞, 右半部分是独占式访问资源时, 同一时刻其他访问被阻塞   
+通过调用同步器的 `acquireShared(int arg)` 方法而可以共享式地获取同步状态
+```Java
+public final void acquireShared(int arg) {
+    if (tryAcquireShared(arg) < 0)
+        doAcquireShared(arg);
+}
+
+private void doAcquireShared(int arg) {
+    final Node node = addWaiter(Node.SHARED);
+    boolean failed = true;
+    try {
+        boolean interrupted = false;
+        for (;;) {
+            final Node p = node.predecessor();
+            if (p == head) {
+                int r = tryAcquireShared(arg);
+                if (r >= 0) {
+                    setHeadAndPropagate(node, r);
+                    p.next = null; // help GC
+                    if (interrupted)
+                        selfInterrupt();
+                    failed = false;
+                    return;
+                }
+            }
+            if (shouldParkAfterFailedAcquire(p, node) &&
+                parkAndCheckInterrupt())
+                interrupted = true;
+        }
+    } finally {
+        if (failed)
+            cancelAcquire(node);
+    }
+}
+```
+在 `acquireShared(int arg)` 方法中, 同步器调用 `tryAcquireShared(int arg)` 方法尝试获取同步状态, `tryAcquireShared(int arg)` 方法返回值为 int 类型, 当返回值大于等于 0 时, 表示能够获取到同步状态; 因此在共享式获取的自旋过程中, 成功获取到同步状态并退出自旋的条件就是 `tryAcquireShared(int arg)` 方法返回值大于等于 0; 可以看到, 在 `doAcquireShared(int arg)` 方法的自旋过程中, 如果当前节点的前驱头节点时, 尝试获取同步状态, 如果返回值大于等于 0, 表示该次获取同步状态成功并从自旋过程中退出  
+与独占式一样, 共享式获取也需要释放同步状态, 通过调用 `releaseShared(int arg)` 方法可以释放同步状态
+```Java
+public final boolean releaseShared(int arg) {
+    if (tryReleaseShared(arg)) {
+        doReleaseShared();
+        return true;
+    }
+    return false;
+}
+```
+该方法在释放同步状态之后, 将会唤醒后续处于等待状态的节点; 对于能够支持多个线程同时访问的并发组件 (如 Semaphore), 它和独占式主要区别在于 `tryReleaseShared(int arg)` 方法确保同步状态 (或资源数) 线程安全释放一般是通过循环和 CAS 来保证的, 因为释放同步状态的操作会同时来自于多个线程
+
+###### 独占式超时获取同步状态
+通过调用同步器的 `doAcquireNanos(int arg, long nanosTimeout)` 方法可以超时获取同步状态, 即在指定时间段内获取同步状态, 如果获取到同步状态则返回 true, 否则返回 false; 该方法提供了 synchronized 关键字不具备的特性  
+在 Java 5 之前, 在响应中断的同步状态获取过程中, 当一个线程获取不到锁而被阻塞在 synchronized 之外时, 对该线程进行中断操作, 此时该线程的中断标志会被修改, 但线程依旧会阻塞在 synchronized 上, 等待着获取锁; 在 Java 5 之后, 同步器提供了 `acquireInterruptibly(int arg)` 方法, 这个方法在等待获取同步状态时, 如果当前线程被中断, 会立刻返回, 并抛出 `InterruptedException`  
+超时获取同步状态过程可以被视作响应中断获取同步状态过程的 "增强版", `doAcquireNanos(int arg, long nanosTimeout)` 方法在支持响应中断的基础上, 增加了超时获取的特性; 该方法代码如下
+```Java
+private boolean doAcquireNanos(int arg, long nanosTimeout)
+            throws InterruptedException {
+    if (nanosTimeout <= 0L)
+        return false;
+    final long deadline = System.nanoTime() + nanosTimeout;
+    final Node node = addWaiter(Node.EXCLUSIVE);
+    boolean failed = true;
+    try {
+        for (;;) {
+            final Node p = node.predecessor();
+            if (p == head && tryAcquire(arg)) {
+                setHead(node);
+                p.next = null; // help GC
+                failed = false;   
+                return true;
+            }
+            nanosTimeout = deadline - System.nanoTime();
+            if (nanosTimeout <= 0L)
+                return false;
+            if (shouldParkAfterFailedAcquire(p, node) &&
+                nanosTimeout > spinForTimeoutThreshold)
+                LockSupport.parkNanos(this, nanosTimeout);
+            if (Thread.interrupted())
+                throw new InterruptedException();
+        }
+    } finally {
+        if (failed)
+            cancelAcquire(node);
+    }
+}
+```
+该方法在自旋过程中, 当节点的前驱节点为头节点时尝试获取同步状态, 如果获取成功则从该方法返回, 这个过程和独占式同步获取的过程类似, 只是在同步状态获取失败的处理上有所不同; 如果当前线程获取同步状态失败, 则判断是否超时, 如果没有超时则重新计算超时间隔, 直到 nanosTimeout 小于等于零时返回; 独占式超时获取同步状态的流程图如下所示  
+![独占式超时获取同步状态的流程.png](http://ww1.sinaimg.cn/large/d8f31fa4gy1g6pb4fl3ttj20i00mjdh3.jpg)
+
+##### 自定义同步组件 --- TwinsLock
+设计一个同步工具: 该工具在同一时刻, 只允许至多两个线程同时访问, 超过两个线程的访问将被阻塞, 将其命名为 TwinsLock  
+分析可知此工具支持共享式访问, 所以必须重写 `acquireShared(int arg)` 等与 Shared 相关的方法, 其次至多两个线程同时访问, 表明同步资源数为 2, 即设置初始状态 status 为 2; 当资源都被获取, 此时再有新的线程获取同步状态则只能被阻塞, 在同步状态变更时, 需要使用 `compareAndSet(int expect, int update)` 方法做原子性保障
+```Java
+class TwinsLock implements Lock {
+
+    public static void main(String[] args) throws InterruptedException {
+        final Lock lock = new TwinsLock();
+        class Worker extends Thread {
+            @Override
+            public void run() {
+                while (true) {
+                    lock.lock();
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                        System.out.println(Thread.currentThread().getName());
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } finally {
+                        lock.unlock();
+                    }
+                }
+            }
+        }
+
+        // 启动 10 个线程
+        for (int i = 0; i < 10; i++) {
+            Worker worker = new Worker();
+            worker.setDaemon(true);
+            worker.start();
+        }
+
+        // 每隔 1 秒换行
+        for (int i = 0; i < 100; i++) {
+            TimeUnit.SECONDS.sleep(1);
+            System.out.println();
+        }
+    }
+
+    private final Sync sync = new Sync(2);
+
+    @Override
+    public void lock() {
+        sync.acquireShared(1);
+    }
+
+    @Override
+    public void lockInterruptibly() throws InterruptedException {
+        sync.tryAcquireShared(1);
+    }
+
+    @Override
+    public boolean tryLock() {
+        return sync.tryAcquireShared(1) >= 0;
+    }
+
+    @Override
+    public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
+        return sync.tryAcquireSharedNanos(1, unit.toNanos(time));
+    }
+
+    @Override
+    public void unlock() {
+        sync.releaseShared(1);
+    }
+
+    @Override
+    public Condition newCondition() {
+        return sync.newCondition();
+    }
+
+    private static final class Sync extends AbstractQueuedSynchronizer {
+
+        Sync(int count) {
+            if (count <= 0) {
+                throw new IllegalArgumentException("The count must large than zero.");
+            }
+            setState(count);
+        }
+
+        @Override
+        protected int tryAcquireShared(int reduceCount) {
+            for (;;) {
+                int current = getState();
+                int newCount = current - reduceCount;
+                if (newCount < 0 || compareAndSetState(current, newCount)) {
+                    return newCount;
+                }
+            }
+        }
+
+        @Override
+        protected boolean tryReleaseShared(int returnCount) {
+            for (;;) {
+                int current = getState();
+                int newCount = current + returnCount;
+                if (compareAndSetState(current, newCount)) {
+                    return true;
+                }
+            }
+        }
+
+        Condition newCondition() {
+            return new ConditionObject();
+        }
+    }
+}
+```
+可以看到, 同步器作为一个桥梁, 连接线程访问以及同步状态控制等底层技术与不同并发组件 (如 Lock, CountDownLatch 等)
+
+#### 重入锁
