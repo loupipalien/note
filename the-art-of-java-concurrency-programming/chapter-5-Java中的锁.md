@@ -512,3 +512,243 @@ class TwinsLock implements Lock {
 可以看到, 同步器作为一个桥梁, 连接线程访问以及同步状态控制等底层技术与不同并发组件 (如 Lock, CountDownLatch 等)
 
 #### 重入锁
+ReentrantLock 就是支持重进入的锁, 它表示该锁能够支持一个线程对资源的重复加锁; 除此之外, 该锁还支持获取锁时的公平和非公平性的选择  
+之前的 Mutex 的 lock() 方法获取锁之后, 如果再次调用 lock() 方法, 则该线程将会被自己所阻塞, 原因是 Mutex 在实现 `tryAcquire(int arg)` 方法时没有考虑占有锁 的线程再次获取锁的场景; 简单的说就是 Mutex 是一个不支持重进入的锁; 而 synchronized 关键字隐式的支持重进入, 比如一个 synchronized 修饰的递归方法, 在方法执行时执行线程在获取了锁之后仍能连续多次的获得该锁, 而不像 Mutex 由于获得了锁, 而在下一次获取锁时阻塞自己的情况  
+ReentrantLock 虽然没能像 synchronized 关键字一样支持隐式的重进入, 但是在调用 lock() 方法时, 已经获取的锁的线程, 能够再次调用 lock() 方法获取锁而不被阻塞  
+对于公平性, 先对锁进行获取的请求一定先被满足, 那么这个锁是公平的, 反之是不公平的; 然而公平锁机制的效率往往没有非公平锁的效率高, 但公平锁能够减少 "饥饿" 发生的概率; ReentrantLock 提供了一个构造函数, 能够控制锁是否公平
+##### 实现重进入
+重进入是值任意线程在获取到锁之后能够再次获取该锁而不会被锁所阻塞, 该特性的实现需要解决以下两个问题
+- 线程再次获取锁: 所需要去识别获取锁的线程是否为当前占据锁的线程, 如果是则再次成功获取
+- 锁的最终释放: 线程重复 n 次获取了锁, 随后在第 n 次释放锁之后, 其他线程应该能够获取到该锁; 锁的最终释放要求锁对于获取进行计数自增, 对于释放进行计数自减, 当计数为 0 时表示锁已经成功释放  
+
+ReentrantLock 默认的 (非公平) 实现如下
+```Java
+final boolean nonfairTryAcquire(int acquires) {
+    final Thread current = Thread.currentThread();
+    int c = getState();
+    if (c == 0) {
+        if (compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+    }
+    else if (current == getExclusiveOwnerThread()) {
+        int nextc = c + acquires;
+        if (nextc < 0) // overflow
+            throw new Error("Maximum lock count exceeded");
+        setState(nextc);
+        return true;
+    }
+    return false;
+}
+```
+该方法增加了再次获取同步状态的处理逻辑: 通过判断当前线程是否为获取锁的线程来决定获取操作是否成功, 如果是获取锁的线程再次请求, 则将同步状态值进行增加并返回 true; 成功获取锁的线程再次获取锁时只是增加了同步状态值, 这也要求 ReentrantLock 在释放同步状态时减少同步状态值
+```Java
+protected final boolean tryRelease(int releases) {
+    int c = getState() - releases;
+    if (Thread.currentThread() != getExclusiveOwnerThread())
+        throw new IllegalMonitorStateException();
+    boolean free = false;
+    if (c == 0) {
+        free = true;
+        setExclusiveOwnerThread(null);
+    }
+    setState(c);
+    return free;
+}
+```
+如果该锁被获取了 n 次, 那么前 n - 1 次 `tryRelease(int releases)` 方法必须返回 false
+
+##### 公平锁与非公平锁的区别
+公平性与否是针对获取锁而言的, 如果一个锁是公平的, 那么锁的获取顺序就应该符合 FIFO; 对于非公平锁, 只要 CAS 设置同步状态成功, 则表示当前线程获取了锁, 而公平锁不同
+```Java
+protected final boolean tryAcquire(int acquires) {
+    final Thread current = Thread.currentThread();
+    int c = getState();
+    if (c == 0) {
+        if (!hasQueuedPredecessors() &&
+            compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+    }
+    else if (current == getExclusiveOwnerThread()) {
+        int nextc = c + acquires;
+        if (nextc < 0)
+            throw new Error("Maximum lock count exceeded");
+        setState(nextc);
+        return true;
+    }
+    return false;
+}
+```
+与非公平锁唯一的不同是判断条件多了 `hasQueuedPredecessors()` 方法, 即使用了队列来维护线程获取锁顺序的 FIFO
+
+#### 读写锁
+之前提到的锁 (Mutex 和 ReentrantLock) 基本都是排他锁, 这些锁在同一时刻只允许一个线程进行访问; 读写锁维护了一对锁, 一个读锁和一个写锁, 通过分离读锁和写锁, 使得并发性相比一般的排他锁有了很大提升  
+一般情况下, 读写锁的性能都比排他锁好, 因为大多数场景读是多于写的; 在读多于写的情况下, 读写锁能提供比排他锁更好的并发性和吞吐量; ReentrantReadWriteLock 提供的特性如下
+
+| 特性 | 说明 |
+| :--- | :--- |
+| 公平性选择 | 支持非公平 (默认) 和公平的锁的提取方式, 吞吐量是非公平优于公平 |
+| 重进入 | 该锁支持重进入, 以读写线程为例: 读线程在获取了读锁之后, 能够再次获取读锁; 而写线程在获取了写锁之后能够再次获取写锁, 同时也可以获取读锁 |
+| 锁降级 | 遵循获取写锁, 获取读锁再释放写锁的次序, 写锁能够降级成为读锁 |
+
+##### 读写锁的接口与示例
+ReadWriteLock 仅定义了获取读锁和写锁的两个方法, 而其实现 ReentrantReadWriteLock 除了接口方法外, 还提供了一些便于外界监控其内部工作状态的方法
+
+| 方法名称 | 描述 |
+| :--- | :--- |
+| int getReadLockCount() | 返回当前读锁被获取的次数, 该次数不等于获取读锁的线程数, 例如仅一个线程, 它连续重入了 n 次读锁, 那么占据读锁的线程数是 1, 但该方法返回 n |
+| int getReadHoldCount() | 返回当前线程获取读锁的次数 |
+| boolean isWriteLocked() | 判断写锁是否被获取 |
+| int getWriteHoldCount() | 返回当前写锁被获取的次数 |
+
+以下是一个缓存示例, 展示了读写锁的使用方式
+```Java
+public class Cache {
+    static Map<String,Object> map = new HashMap<>();
+    static ReadWriteLock rwl = new ReentrantReadWriteLock();
+    static Lock rl = rwl.readLock();
+    static Lock wl = rwl.writeLock();
+
+    // 获取一个 key 对应的 value
+    public static final Object get(String key) {
+        rl.lock();
+        try {
+            return map.get(key);
+        } finally {
+             rl.unlock();
+        }
+    }
+
+    // 设置 key 对应的 value, 并返回旧的 value
+    public static final Object put(String key, Object value) {
+        wl.lock();
+        try {
+            return map.put(key, value);
+        } finally {
+            wl.unlock();
+        }
+    }
+
+    public static final void clear() {
+        wl.lock();
+        try {
+            map.clear();
+        } finally {
+            wl.unlock();
+        }
+    }
+}
+```
+
+##### 读写锁的实现分析
+ReentrantReadWriteLock 的实现主要包括: 读写状态的设计, 写锁的获取与释放, 读锁的获取与释放以及锁降级
+
+###### 读写状态的设计
+读写锁同样依赖自定义同步器来实现同步功能, 而读写状态就是其同步器的同步状态, 在 ReentrantLock 中自定义同步器的实现, 同步状态表示锁被一个线程重复获取的次数, e而读写锁的自定义同步器需要在同步状态 (一个整型变量) 上维护多个读线程和一个写线程的状态, 使得该状态的设计成为读写锁的实现关键  
+如果在一个整型变量上维护多种状态, 就一定需要 "按位切割使用" 这个变量, 读写锁将变量切分成了两个部分, 高 16 位表示读, 低 16 位表示写, 划分方式如下图所示
+```Java
+32 位
+[0][0][0][0][0][0][0][0][0][0][0][0][0][0][1][0][0][0][0][0][0][0][0][0][0][0][0][0][0][0][1][1]
+                                                16 位
+                                                [0][0][0][0][0][0][0][0][0][0][0][0][0][0][1][1] 写状态 = 3
+16 位                                
+[0][0][0][0][0][0][0][0][0][0][0][0][0][0][1][0] 读状态 = 2
+```
+当前同步状态表示了一个线程已经获取了写锁, 并且重入了两次, 同时也连续获取了两次写锁; 当 S 不等于 0 时, 当写状态 (S & 0x0000FFFF) 等于 0 时, 则读状态 (S >>> 16) 大于 0, 即读锁已被获取
+
+###### 写锁的获取与释放
+写锁是一个支持重进入的排它锁; 如果当前线程已经获取了写锁, 则增加写状态, 如果当前线程在获取写锁时, 读锁已经被获取 (读状态不为 0) 或者该线程不是已经获取写锁的线程, 则当前线程进入等待状态; 获取**写锁**的代码如下
+```Java
+protected final boolean tryAcquire(int acquires) {
+    Thread current = Thread.currentThread();
+    int c = getState();
+    int w = exclusiveCount(c);
+    if (c != 0) {
+        // (Note: if c != 0 and w == 0 then shared count != 0)
+        if (w == 0 || current != getExclusiveOwnerThread())
+            return false;
+        if (w + exclusiveCount(acquires) > MAX_COUNT)
+            throw new Error("Maximum lock count exceeded");
+        // Reentrant acquire
+        setState(c + acquires);
+        return true;
+    }
+    if (writerShouldBlock() ||
+        !compareAndSetState(c, c + acquires))
+        return false;
+    setExclusiveOwnerThread(current);
+    return true;
+}
+```
+该方法除了重入条件 (当前线程为获取了写锁的线程) 之外, 增加了一个读锁是否存在的判断, 如果存在读锁, 则写锁不能被获取, 原因在于: 读写锁要确保写锁的操作对读锁可见, 如果允许读锁在已被获取的情况下获取写锁, 那么正在运行的其他读线程就无法感知到当前写线程的操作; 写锁的释放与 ReentrantLock 的释放过程基本类似
+
+###### 读锁的获取与释放
+读锁是一个支持重进入的共享锁, 它能够被多个线程同时获取, 在没有其他写线程访问 (或者写状态为 0) 时, 读锁总会被成功地获取, 而所做的也只是 (线程安全的) 增加读状态; 如果当前线程已经获取了读锁, 则增加读状态; 如果当前线程在获取读锁时, 写锁已经被其他线程获取, 则进入等待状态; 获取读锁的实现版本升级中变得复杂, 主要是因为新增了一些功能; 例如 `getReadHoldCount()` 方法, 作用是返回当前线程获取读锁的次数; 读状态是所有线程获取读锁次数总和, 而每个线程各自后去读锁的次数只能选择保存在 ThreadLocal 中, 由线程自身维护, 这使得读取锁的实现变得复杂; 获取**读锁**的代码如下
+```Java
+protected final int tryAcquireShared(int unused) {
+    Thread current = Thread.currentThread();
+    int c = getState();
+    if (exclusiveCount(c) != 0 &&
+        getExclusiveOwnerThread() != current)
+        return -1;
+    int r = sharedCount(c);
+    if (!readerShouldBlock() &&
+        r < MAX_COUNT &&
+        compareAndSetState(c, c + SHARED_UNIT)) {
+        if (r == 0) {
+            firstReader = current;
+            firstReaderHoldCount = 1;
+        } else if (firstReader == current) {
+            firstReaderHoldCount++;
+        } else {
+            HoldCounter rh = cachedHoldCounter;
+            if (rh == null || rh.tid != getThreadId(current))
+                cachedHoldCounter = rh = readHolds.get();
+            else if (rh.count == 0)
+                readHolds.set(rh);
+            rh.count++;
+        }
+        return 1;
+    }
+    return fullTryAcquireShared(current);
+}
+```
+如果其他线程获取了写锁, 则当前线程获取读锁失败, 进入等待状态; 如果当前线程获取了写锁或者写锁未被获取, 则当前线程增加读状态, 成功获取读锁
+
+###### 锁降级
+锁降级指的是写锁降级成为读锁, 如果当前线程拥有写锁, 然后将其释放, 最后再获取读锁, 这种分段完成的过程不能称之为锁降级; 锁降级是指把持住 (当前拥有的) 写锁, 再获取到读锁, 随后释放 (先前拥有的) 写锁的过程  
+以下是一个锁降级的示例; 因为数据不常变化, 所以多个线程可以并发的进行数据处理, 当数据变更后, 如果当前线程感知到数据变化, 则进行数据的装备工作, 同时其他处理线程被阻塞, 直到当前线程完成数据的准备工作
+```Java
+public void processData() {
+    readLock.lock();
+    if (!update) {
+        // 必须先释放锁
+        readLock.unlock();
+        // 锁降级从写锁获取到开始
+        writeLock.lock();
+        try {
+            if (!update) {
+                // 准备数据的流程
+                update = true;
+            }
+            readLock.lock();
+        } finally {
+            // 锁降级完成, 写锁降级为读锁
+            writeLock.unlock();
+        }
+    }
+    try {
+        // 使用数据的流程
+    } finally {
+        readLock.unlock();
+    }
+}
+```
+当数据发生变更后, update 变量 (volatile 修饰的 boolean 变量) 被设置为 false, 此时所有访问 `processData()` 的线程都能感知到变化; 在这里锁降级是否必须? 答案是必须的; 主要是为了保证数据的可见性, 如果当前线程不获取读锁而是直接释放写锁, 假设此时另一个线程 (假设为 T)获取了写锁并修改了数据, 那么当前线程无法感知线程 T 的数据更新; 如果当前线程获取读锁, 即遵循锁降级的步骤, 线程 T 会被阻塞, 知道当前线程使用数据并释放读锁之后, 线程 T 才能获取写锁进行数据更新  
+ReentrantReadWriteLock 不支持锁升级 (把持读锁, 获取写锁, 最后释放读锁的过程)
+
+#### LockSupport 工具
+当需要阻塞或唤醒一个线程的时候, 都会使用 LockSupport 工具类来完成相应工作, LockSupport 定义了一组公共静态方法, 
