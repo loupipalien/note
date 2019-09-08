@@ -751,4 +751,57 @@ public void processData() {
 ReentrantReadWriteLock 不支持锁升级 (把持读锁, 获取写锁, 最后释放读锁的过程)
 
 #### LockSupport 工具
-当需要阻塞或唤醒一个线程的时候, 都会使用 LockSupport 工具类来完成相应工作, LockSupport 定义了一组公共静态方法, 
+当需要阻塞或唤醒一个线程的时候, 都会使用 LockSupport 工具类来完成相应工作, LockSupport 定义了一组公共静态方法, 这些方法提供了最基本的线程阻塞和唤醒功能, 而 LockSupport 也成为了构建同步组件的基础工具; LockSupport 定义了一组以 park 开头的方法用来阻塞当前线程, 以及 unpark(Thread thread) 的方法来唤醒一个被阻塞的线程
+
+| 方法名称 | 描述 |
+| :--- | :--- |
+| void park() | 阻塞当前线程, 如果调用 unpark(Thread thread) 方法或者当前线程被中断, 才能从 park() 方法返回 |
+| void parkNanos(long nanos) | 阻塞当前线程, 最长不超过 nanos 纳秒, 返回条件在 park() 的基础上增加了超时返回 |
+| void parkUntil(long deadline) | 阻塞当前线程, 直到 deadline 时间 |
+| void unpark(Thread thread) | 唤醒处于阻塞状态的线程 thread |
+
+#### Condition 接口
+任意一个 Java 对象, 都拥有一组监视器方法 (定义在 java.lang.Object 上), 主要包括 `wait(), wait(long timeout), notify(), notifyAll()` 方法, 这些方法与 synchronized 同步关键字配合, 可以实现等待/通知模式; Condition 接口也提供了类似 Object 的监视器方法, 与 Lock 配合可以实现等待/通知模式, 但是这两者在使用方式上以及功能特性上还是有差别的
+
+| 对比项 | Object Monitor Methods | Condition |
+| :--- | :--- | :--- |
+| 前置条件 | 获取对象的锁 | 调用 Lock.lock() 获取锁, 调用 Lock.newCondition() 获取 Condition 对象 |
+| 调用方式 | 直接调用 object.wait() | 直接调用 condition.await() |
+| 等待队列个数 | 一个 | 多个 |
+| 当前线程释放锁并进入等待状态 | 支持 | 支持 |
+| 当前线程释放锁并进入等待状态, 在等待状态中不响应中断 | 不支持 | 支持 |
+| 当前线程释放锁并进入超时等待状态 | 支持 | 支持 |
+| 当前线程释放锁并进入等待状态到将来的某个时间 | 不支持 | 支持 |
+| 唤醒等待队列中的一个线程 | 支持 | 支持 |
+| 唤醒等待队列中的多个线程 | 支持 | 支持 |
+
+##### Condition 接口与示例
+Condition 定义了等待/通知两种类型的方法, 当前线程调用这些方法时, 需要提前获取到 Condition 对象关联的锁; Condition 对象是由 Lock 对象 (调用 Lock 对象的 newCondition() 方法) 创建出来的, 即 Condition 是依赖 Lock 对象的; Condition 的使用方式比较简单, 需要注意在调用方法前获取所, 使用示例如下
+```Java
+Lock lock = new ReentrantLock();
+Condition condition = lock.newCondition();
+
+public void conditionAwait() throws InterruptedException {
+    lock.lock();
+    try {
+        condition.await();
+    } finally {
+        lock.unlock();
+    }
+}
+
+public void conditionSignal() {
+    lock.lock();
+    try {
+        condition.signal();
+    } finally {
+        lock.unlock();
+    }
+}
+```
+如示例所示, 一般都会将 Condition 对象作为成员变量; 当调用了 await() 方法后, 当前线程会释放锁并在此等待, 而其他线程调用 Condition 对象的 signal 方法, 通知当前线程后, 当前线程才从 await() 方法中返回, 并且在返回前已经获得了锁  
+Condition 定义的部分方法以及描述如下
+
+| 方法名称 | 描述 |
+| :--- | :--- |
+| void await() | 当前线程进入等待状态直到被通知 (signal) 或中断, 当前线程进入运行状态且从 await() 方法返回的情况包括: 其他线程调用该 condition 的 signal() 或 signalAll() 方法, 而当前线程被选中唤醒 |
