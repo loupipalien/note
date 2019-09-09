@@ -805,3 +805,184 @@ Condition 定义的部分方法以及描述如下
 | 方法名称 | 描述 |
 | :--- | :--- |
 | void await() | 当前线程进入等待状态直到被通知 (signal) 或中断, 当前线程进入运行状态且从 await() 方法返回的情况包括: 其他线程调用该 condition 的 signal() 或 signalAll() 方法, 而当前线程被选中唤醒 |
+| void awaitUninterruptibly() | 当前线程进入等待状态直到被通知, 从方法名称上可以看出该方法对中断不敏感 |
+| long awaitNanos(long nanosTimeout) | 当前线程进入等待状态知道被通知, 中断或者超时; 返回值表示剩余是时间 |
+| boolean awaitUntil(Date deadline) | 当前线程进入等待状态直到被通知, 中断或者到某个时间; 如果没有到指定时间就被通知, 方法返回 true, 否则表示到了指定时间, 方法返回 false |
+| void signal() | 唤醒一个等待在 Condition 上的线程, 该线程从等待方法返回前必须获取的与 Condition 相关联的锁 |
+| void signalAll() | 唤醒所有等待在 Condition 上的线程, 能够从等待方法返回的线程必须获得与 Condition 相关的锁 |
+
+获取一个 Condition 必须通过 Lock.newCondition() 方法; 下面展示一个有界队列的示例展示 Condition 的使用方式
+```Java
+public class BoundedQueue<T> {
+    private Object[] items;
+    // 添加的下标, 删除的下标和数组当前数量
+    private int addIndex, removeIndex, count;
+    private Lock lock = new ReentrantLock();
+    private Condition notEmpty = lock.newCondition();
+    private Condition notFull = lock.newCondition();
+
+    public BoundedQueue(int size) {
+        items = new Object[size];
+    }
+
+    // 添加一个元素, 如果数组满了, 则添加线程进入等待状态, 直到有 "空位"
+    public void add(T t) throws InterruptedException {
+        lock.lock();
+        try {
+            while (count == items.length) {
+                notFull.await();
+            }
+            items[addIndex] = t;
+            if (++addIndex == items.length) {
+                addIndex = 0;
+            }
+            count++;
+            notEmpty.signal();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // 由头部删除一个元素, 如果数组空, 则删除线程进入等待状态, 直到有新添加元素
+    public T remove() throws InterruptedException {
+        lock.lock();
+        try {
+            while (count == 0) {
+                notEmpty.wait();
+            }
+            Object obj = items[removeIndex];
+            if (++removeIndex == items.length) {
+                removeIndex = 0;
+            }
+            count--;
+            notFull.signal();
+            return (T) obj;
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+```
+首先需要获得锁, 目的是确保数组修改的可见性和排他性; 在添加和删除方法中使用 while 循环而非 if 判断, 目的是防止过早或意外的通知; 这与经典范式的等待/通知是非常类似的
+
+##### Condition 的实现分析
+ConditionObject 是同步器 AbstractQueuedSynchronizer 的内部类, 因为 Condition 的操作需要获取相关联的锁, 所以作为同步器的内部类也是合理的; 每个 Condition 对象都包含着一个队列, 该队列是 Condition 对象实现等待/通知功能的关键; 下面将分析 Condition 的实现, 主要包括等待队列, 等待和通知
+###### 等待队列
+等待队列是一个 FIFO 的队列, 在队列中的每个节点都包含了一个线程引用, 该线程就是在 Condition 对象上等待的线程, 如果一个线程调用了 Condition.await() 方法, 那么该线程将会释放锁, 构造成节点加入等待队列并进入等待状态; 这里的节点定义复用了同步器中节点的含义, 也就是说, 同步队列和等待队列中的节点类型都是同步器的静态内部类 AbstractQueuedSynchronizer.Node
+```
+-----------------
+|    Condtion   |          --------------          --------------          --------------
+| ------------- |          |    节点    |          |     节点    |          |    节点    |
+| |firstWaiter| | ------>  | nextWaiter | -------> | nextWaiter | -------> | nextWaiter |
+| ------------- |          --------------          --------------          --------------
+| |lastWaiter | | ----------------------------------------------------------------^
+| ------------- |
+-----------------
+```
+Condtion 拥有首尾节点的引用, 新增节点只需要将原有的尾节点 nextWaiter 指向它, 并且更新尾节点即可; 上述节点引用更新的过程并没有使用 CAS 保证, 原因在于调用 await() 方法的线程必定是获取了锁的线程, 也就是说该过程是由锁来保证线程安全的  
+在 Object 的监视模型上, 一个对象拥有一个同步队列和等待队列, 而并发包 Lock (更确切的说是同步器) 拥有一个同步队列和多个等待队列
+```
+---------
+| 同步器 |      -------       -------       -------       -------
+|       |      | 节点 |      | 节点 |       | 节点 |      | 节点 |
+| head  | ---> | prev | <--- | prev | <--- | prev | <--- | prev |   
+| tail  |      | next | ---> | next | ---> | next | ---> | next |
+---------      -------       -------       -------       --------
+ ^  |                                                       ^
+ |  --------------------------------------------------------|
+ |
+ |  -----------------
+ |  |    Condtion   |          --------------          --------------          --------------
+ |  | ------------- |          |    节点    |          |     节点    |          |    节点    |
+ |  | |firstWaiter| | ------>  | nextWaiter | -------> | nextWaiter | -------> | nextWaiter |
+ ---| ------------- |          --------------          --------------          --------------
+ |  | |lastWaiter | | ----------------------------------------------------------------^
+ |  | ------------- |
+ |  -----------------
+ |
+ |  -----------------
+ |  |    Condtion   |          --------------          --------------          --------------
+ |  | ------------- |          |    节点    |          |     节点    |          |    节点    |
+ |  | |firstWaiter| | ------>  | nextWaiter | -------> | nextWaiter | -------> | nextWaiter |
+ ---| ------------- |          --------------          --------------          --------------
+    | |lastWaiter | | ----------------------------------------------------------------^
+    | ------------- |
+    -----------------
+```
+Condtion 的实现是同步器的内部类, 因此每个 Condition 实例都能够访问同步器提供的方法
+
+###### 等待
+调用 Condition 的 await() 方法 (或者以 await 开头的方法), 会使当前线程进入等待队列并释放锁, 同时线程状态变为等待状态; 当从 await() 方法返回时, 当前线程一定获取了 Condition 相关联的锁; 从队列的角度来看, 当调用 await() 方法时, 相当于同步队列的首节点 (获取了锁的节点) 移动到 Condition 的等待队列中
+```Java
+public final void await() throws InterruptedException {
+    if (Thread.interrupted())
+        throw new InterruptedException();
+    Node node = addConditionWaiter();
+    long savedState = fullyRelease(node);
+    int interruptMode = 0;
+    while (!isOnSyncQueue(node)) {
+        LockSupport.park(this);
+        if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+            break;
+    }
+    if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
+        interruptMode = REINTERRUPT;
+    if (node.nextWaiter != null) // clean up if cancelled
+        unlinkCancelledWaiters();
+    if (interruptMode != 0)
+        reportInterruptAfterWait(interruptMode);
+}
+```
+调用该方法的线程成功获取了锁的线程, 也就是同步队列中的首节点, 该方法会将当前线程构造成节点并加入等待队列中, 然后释放同步状态, 唤醒同步队列中的后继节点, 然后当前线程会进入等待状态; 当等待队列中的节点被唤醒, 则唤醒节点的线程开始尝试获取同步状态, 如果不是通过其他线程调用 Condition.signal() 方法唤醒, 而是对等待线程进行中断, 则会抛出 InterruptedException
+```
+---------   --------------------v
+| 同步器 |  |   =======       -------       -------       -------
+|       |   |  | 节点 |      | 节点 |       | 节点 |      | 节点 |
+| head  | ---  | prev | <--- | prev | <--- | prev | <--- | prev |   
+| tail  |      | next | ---> | next | ---> | next | ---> | next |
+---------      =======       -------       -------       --------
+ ^  |             |                                         ^
+ |  --------------|-----------------------------------------|
+ |                --------------------------------------------------------------------
+ |  -----------------            以节点的线程构造新的节点并加入等待队列                  v
+ |  |    Condtion   |          --------------          --------------          ==============
+ |  | ------------- |          |    节点    |          |     节点    |          |    节点    |
+ |  | |firstWaiter| | ------>  | nextWaiter | -------> | nextWaiter | -------> | nextWaiter |
+ ---| ------------- |          --------------          --------------          ==============
+    | |lastWaiter | | ----------------------------------------------------------------^
+    | ------------- |
+    -----------------
+```
+
+###### 通知
+调用 Condition 的 signal() 方法, 将会唤醒在等待队列中等待时间最长的节点 (首节点), 在唤醒节点之前, 会将节点移到同步队列中
+```Java
+public final void signal() {
+    if (!isHeldExclusively())
+        throw new IllegalMonitorStateException();
+    Node first = firstWaiter;
+    if (first != null)
+        doSignal(first);
+}
+```
+调用该方法的前置条件是当前线程必须获取了锁, 可以看到 signal() 方法进行了 isHeldExclusively() 检查, 也就是当前线程必须是获取了锁的线程; 接着获取等待队列的首节点, 将其移动到同步队列并使用 LockSupport 唤醒节点中的线程
+```
+---------   
+| 同步器 |      -------       -------       -------       -------
+|       |      | 节点 |      | 节点 |       | 节点 |      | 节点 |
+| head  | ---> | prev | <--- | prev | <--- | prev | <--- | prev |   
+| tail  |      | next | ---> | next | ---> | next | ---> | next |
+---------      =======       -------       -------       --------
+ ^  |                                                       ^
+ |  ------------------------------        -------------------
+ |                               |        |
+ |  -----------------            v        |                                               
+ |  |    Condtion   |          ==============          --------------          --------------
+ |  | ------------- |          |    节点    |          |     节点    |          |    节点    |
+ |  | |firstWaiter| | ----     | nextWaiter |          | nextWaiter | -------> | nextWaiter |
+ ---| ------------- |    |     =============          --------------           --------------
+    | |lastWaiter | |    ------------------------------------^                      ^
+    | ------------- |----------------------------------------------------------------
+    -----------------
+```
+通过调用同步器的 `enq(Node node)` 方法, 等待队列中的头节点线程安全的移动到同步队列; 当节点移动到同步队列后, 当前线程再使用 LockSupport 唤醒该节点的线程; 被唤醒的线程将从 await() 方法的 while 循环中退出 (isOnSyncQueue(Node node) 方法返回 true), 进而调用同步器的 acquireQueued() 方法加入到获取同步状态的竞争中; 成功获取同步状态后, 被唤醒的线程将从先前调用的 await() 方法返回, 此时该线程已经成功获取了锁; Condition 的 signalAll() 方法相当于等待队列中的每个节点执行一次 signal() 方法
