@@ -18,9 +18,16 @@ ThreadPoolExecutor 执行 execute() 方法的示意图
                 | 否                  | 否
                 v                    v
          -----------------      -----------------
-        |核心线程池是否已满|     |将任务存储在队列里|
+        | 创建线程执行任务 |     |将任务存储在队列里|
          -----------------      -----------------
 ```
+从图中可以看出, 当提交一个新任务到线程池时, 线程池的处理流程如下
+- 线程池判断核心线程池里的线程是否都在执行任务, 如果不是则创建一个新的工作线程来执行任务; 如果核心线程池里的线程都在执行任务则进入下一个流程
+- 线程池判断工作队列是否已经满了, 如果工作队列没有满, 则将新提交的任务存储在这个工作队列里; 如果工作队列满了则进入下个流程
+- 线程池判断线程池的线程是否都处于工作状态, 如果没有则创建一个新的工作线程来执行任务; 如果已经满了则交给饱和策略来处理这个任务
+
+ThreadPoolExecutor 执行 execute() 方法示意图如下
+![ThreadPoolExecuto执行示意图.png](http://ww1.sinaimg.cn/large/d8f31fa4gy1g6w5y6nreaj20hw0dq0th.jpg)  
 - 如果当运行的线程少于 corePoolSize, 则创建新线程来执行任务 (执行这一步需要获取全局锁)
 - 如果运行的线程等于或多于 corePoolSize, 则将任务加入 BlockingQueue
 - 如果无法将任务加入 BlockingQueue (队列已满), 则创建新的线程来处理任务 (执行这一步需要获取全局锁)
@@ -43,13 +50,15 @@ new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQ
   - LinkedBlockingQueue: 是一个基于链表结构的阻塞队列, 此队列按 FIFO 原则对元素排序, 吞吐率通常高于 ArrayBlockingQueue; Executors.newFixedThreadPool() 使用这个队列
   - SynchronousQueue: 一个不存储元素的阻塞队列; 每个插入操作必须等到另一个线程调用移除操作, 否则插入一直处于阻塞状态, 吞吐率通常高于 LinkedBlockingQueue; Executors.newCachedThreadPool() 使用这个队列
   - PriorityBlockingQueue: 一个具有优先级的无限阻塞队列
+- maximumPoolSize (线程池最大数量): 线程池允许创建的最大线程数, 如果队列满了, 并且已创建的线程数小于最大线程数, 则线程池会再创建先的线程执行任务; 值得注意的是, 如果使用了无界的任务队列则这个参数无效果  
 - threadFactory: 用于设置创建线程的工厂, 可以通过线程工厂给每个创建出的线程设置有意义的名字
 - handler (饱和策略) : 当队列和线程池都满了, 说明线程池处于饱和状态, 那么必须采用一种策略处理提交的新任务, 默认是 AbortPolicy
   - AbortPolicy: 直接抛出异常
   - CallerRunsPolicy: 只用调用者所在线程来运行
   - DiscardOldestPolicy: 丢弃队列里最近的一个任务, 并执行当前任务
   - DiscardPolicy: 不处理, 丢弃掉
-
+- keepAliveTime (线程活动保持时间): 线程池的工作空闲后, 保持存活的时间 
+- TimeUnit (线程获得保持时间单位): 天, 小时, 分钟, 毫秒, 微秒, 纳秒  
 ##### 向线程池提交任务
 execute() 方法用于提交不需要返回值的任务; submit() 方法用于提交需要返回值的任务
 

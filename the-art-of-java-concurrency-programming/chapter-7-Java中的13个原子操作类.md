@@ -1,5 +1,5 @@
 ### Java 中的 13 个原子操作类
-JDK 5 开始提供了 java.uitl.concurrent.atomic 包, 该包中包含的类属于 4 种类型的原子更新方式, 分别是原子更新基本类型, 原子更新数组, 原子更新引用, 原子更新属性
+JDK 5 开始提供了 java.uitl.concurrent.atomic 包, 该包中包含的类属于 4 种类型的原子更新方式, 分别是原子更新基本类型, 原子更新数组, 原子更新引用, 原子更新属性; atomic 包中的基本都是使用 Unsafe 实现的包装类
 
 #### 原子更新基本类型类
 - AtomicBoolean: 原子更新布尔类型
@@ -37,6 +37,8 @@ AtomicIntegerArray 类中的常用方法
 | :------------- | :------------- |
 | int addAndGet(int i, int delta) | 以原子方式将输入的值和数组中索引 i 的值相加后返回 |
 | boolean compareAndSet(int i, int expect, int update) | 如果输入的数值等于预期值, 则以原子的方式将数组位置 i 的值设置为输入的值 |
+
+需要注意的是, AtomicIntegerArray 构造方法会将参数数组复制一份, 而不会影响传入的数组
 
 #### 原子更新引用类型
 - AtomicReference: 原子更新引用类型

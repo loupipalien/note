@@ -212,3 +212,88 @@ Fork/Join 框架是 Java 7 提供的一个用于并行执行任务的框架, 是
 ```
 
 ###### 工作窃取法算法
+工作窃取 (work-stealing) 算法是指某个线程从其他队列里窃取任务来执行; 由于会和被窃取任务的线程访问同一个队列, 所以为了减少窃取任务线程和被窃取任务之间的竞争, 通常会使用双端队列, 被窃取任务线程永远从双端队列的头部执行任务, 而窃取任务的线程永远从双端队列的尾部拿任务执行
+- 优点: 充分利用线程进行并行计算, 减少了线程间的竞争
+- 缺点: 在某些情况下还是会存在竞争, 比如双端队列只有一个任务时, 并且该算法会消耗了更多的系统资源, 比如创建多个线程和多个双端队列
+
+##### Fork/Join 框架的设计
+- 分割任务: 需要有一个 Fork 类来把大任务分割成子任务, 将其分成至足够小的子任务
+- 执行任务并合并结果: 分割的子任务分别放在双端队列里, 然后启动几个线程分别从双端队列里拿数据, 然后合并这些数据
+
+Fork/Join 使用两个类来完成以上两件事情
+- ForkJoinTask: 使用 ForkJoin 框架, 必须首先创建一个 ForkJoin 任务, 它提供在任务中执行 fork() 和 join() 的机制; 通常情况下只需要直接继承它的子类即可
+  - RecursiveAction: 用于没有返回结果的任务
+  - RecursiveTask: 用于有返回结果的任务
+- ForkJoinPool: ForkJoinTask 需要通过 ForkJoinPool 来执行
+
+任务分割的子任务会添加到当前工作线程所维护的双端队列中, 进入队列的头部; 当一个工作线程的队列里没有任务时, 它会随机从其他工作线程的队列的尾部获取一个任务
+
+##### 使用 Fork/Join 框架
+使用 Fork/Join 框架来计算 1 + 2 + 3 + 4 的结果; 分个子任务的标准是最多两个数相加
+```Java
+public class CountTask extends RecursiveTask<Integer> {
+
+    // 分割阈值
+    private static final int THREDHOLD = 2;
+
+    private int start;
+    private int end;
+
+    public CountTask(int start, int end) {
+        this.start = start;
+        this.end = end;
+    }
+
+    @Override
+    protected Integer compute() {
+        int sum = 0;
+        boolean canCompute = (end - start) <= THREDHOLD;
+        if (canCompute) {
+            for (int i = start; i < end; i++) {
+                sum = +i;
+            }
+        } else {
+            // 如果任务大于阈值, 就分裂成两个子任务计算
+            int middle = (start + end) >> 1;
+            CountTask leftTask = new CountTask(start, middle);
+            CountTask rightTask = new CountTask(middle + 1, end);
+            // 执行子任务
+            leftTask.fork();
+            rightTask.fork();
+            // 等待子任务执行完成, 并得到结果
+            int leftResult = leftTask.join();
+            int rightResult = rightTask.join();
+            // 合并子任务
+            sum = leftResult + rightResult;
+        }
+        return sum;
+    }
+
+    public static void main(String[] args) {
+        ForkJoinPool pool = new ForkJoinPool();
+        // 生成一个计算任务, 1 + 2 + 3 + 4
+        CountTask task = new CountTask(1, 4);
+        // 执行一个任务
+        Future<Integer> result = pool.submit(task);
+        try {
+            System.out.println(result.get());
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+##### Fork/Join 框架的异常处理
+ForkJoinTask 在执行的时候可能会抛出异常, 但是没办法在主线程中直接捕获异常, 所以 ForkJoinTask 提供了 isCompletedAbnormally() 方法来检查任务是否已经抛出异常或已经被取消了, 并且可以获取异常
+```Java
+if (task.isCompletedAbnormally()) {
+    System.out.println(task.getException());
+}
+```
+如果任务被取消了则返回 CancellationException, 如果任务没有完成或者抛出异常则返回 nulls
+
+##### Fork/Join 框架的实现原理
+ForkJoinPool 由 ForkJoinTask 数组和 ForkJoinWorkerThread 组成, ForkJoinTask 数组负责将存放程序提交给 ForkJoinPool 的任务, 而任务 ForkJoinWorkerThread 数组负责执行这些任务
+
+TODO

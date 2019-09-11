@@ -1,7 +1,8 @@
 ### Java 中的并发工具类
+CountDownLatch, CyclicBarrier, Semaphore 工具类提供了一种并发流程控制的手段, Exchanger 工具类则提供了在线程间交换数据的一种手段
 
 #### 等待多线程完成的 CountDownLatch
-CountDownLatch 允许一个或多个线程等待其他线程完成操作
+CountDownLatch 允许一个或多个线程等待其他线程完成操作; 可以实现 Thread.join() 的功能, 并且更强大
 ```
 public class CountDownLatchTest {
     static CountDownLatch c = new CountDownLatch(2);
@@ -22,17 +23,17 @@ public class CountDownLatchTest {
     }
 }
 ```
-CountDownLatch 的构造函数接受一个 int 参数作为计数器, 调用 countDown 方法时, N 就会减 1, CountDownLatch 的 await() 方法会阻塞当前线程, 直到 N 变为零 (一个线程调用 countDown() 方法 happens-before 于另一个线程调用 await() 方法)
+CountDownLatch 的构造函数接受一个 int 参数作为计数器 (不能被重新初始化或修改), 调用 countDown 方法时, N 就会减 1, CountDownLatch 的 await() 方法会阻塞当前线程, 直到 N 变为零 (一个线程调用 countDown() 方法 happens-before 于另一个线程调用 await() 方法)
 
 #### 同步屏障 CyclicBarrier
 CyclicBarrier 的字面意思是可循环使用的屏障, 它可以让一组线程到达一个屏障 (也可以叫同步点) 时被阻塞, 直到最后一个线程到达屏障, 屏障才会开门, 所有被拦截的线程才会继续进行
 
 ##### CyclicBarrier 简介
-CyclicBarrier 默认的构造方法是 CyclicBarrier(int parties), 其参数表示屏障拦截的线程数量, 每个线程调用 await 方法告诉 CyclicBarrier 表示到达屏障
+CyclicBarrier 默认的构造方法是 CyclicBarrier(int parties), 其参数表示屏障拦截的线程数量, 每个线程调用 await 方法告诉 CyclicBarrier 表示到达屏障; 还提供一个更高级的构造函数 CyclicBarrier(int parties, Runnable barrierAction), 用于在足够的线程到达屏障时, 优先执行 barrierAction, 方便处理更复杂的业务场景
 
 #### CyclicBarrier 的应用场景
 CyclicBarrier 可以用于多线程计算数据, 最后合并计算结果的场景
-```
+```Java
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -119,6 +120,7 @@ public class SemaphoreTest {
     }
 }
 ```
+构造方法 Semaphore(int permits) 接受一个整型数字, 表示可用的许可证数量
 
 ##### 其他方法
 - int availablePermits(): 返回此信号量中当前可用的许可证数
@@ -161,3 +163,4 @@ public class ExchangerTest {
     }
 }
 ```
+如果两个线程有一个没有执行 exchange() 方法, 则会一直等待; 为了避免一直等待可以使用 exchange(V x, longtimeour, TimeUnit unit) 设置最大等待时长
