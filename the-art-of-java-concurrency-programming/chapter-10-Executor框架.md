@@ -4,7 +4,10 @@ Java 线程既是工作单元也是执行机制, 在 JDK 5 开始把工作单元
 #### Executor 框架简介
 
 ##### Executor 框架的两级调度模型
-在 Hotspot VM 的线程模型中, Java 线程被一对一映射为本地操作系统线程, Java 线程启动时会创建一个本地操作系统线程; 当 Java 线程终止时, 这个操作系统线程也会被回收, 操作系统会调度所有线程并将它们分配给可用的 CPU; 应用层通过 Executor 框架控制上层的调度, 下层的调度由操作系统内核控制, 下层的调度不受应用程序的控制
+在 Hotspot VM 的线程模型中, Java 线程被一对一映射为本地操作系统线程, Java 线程启动时会创建一个本地操作系统线程; 当 Java 线程终止时, 这个操作系统线程也会被回收, 操作系统会调度所有线程并将它们分配给可用的 CPU  
+在上层, Java 多线程程序通常把应用分解为若干个任务, 然后使用用户级的调度器 (Executor 框架) 将这些任务映射为固定数量的线程; 在底层, 操作系统内核将这些线程映射到硬件处理器上; 这两级调度模型如下图所示
+![任务的两级调度模型.png](http://ww1.sinaimg.cn/large/d8f31fa4gy1g6w6ncfcxoj20h00dhwf4.jpg)  
+应用层通过 Executor 框架控制上层的调度, 下层的调度由操作系统内核控制, 下层的调度不受应用程序的控制
 
 ##### Executor 框架的结构与成员
 
@@ -30,8 +33,13 @@ Future 接口和实现 Future 接口的 FutureTask 类用来表示异步计算�
 这两个接口的实现类都可以被 ThreadPoolExecutor 或 ScheduledThreadPoolExecutor 执行, 它们的区别仅在于 Runnable 不会返回结果, Callable 可以返回结果
 
 #### ThreadPoolExecutor 详解
-TODO
+Executor 框架最核心的类是 ThreadPoolExecutor, 它是线程池的实现类, 主要由以下四个构建组成
+- corePool: 核心线程池大小
+- maximumPool:最大线程池的大小
+- BlockingQueue: 用来暂时保存任务的工作队列
+- RejectedeExecutionHandler: ThreadPoolExecutor 关闭或饱和时, 用于拒绝 execute() 方法执行线程的策略
 
+通过 Executor 框架的工具类 Executors 可以创建三种 ThreadPoolExecutor: FixedThreadPool, SingleThreadExecutor, CachedThreadPool
 ##### FixedThreadPool 详解
 ```
 public static ExecutorService newFixedThreadPool(int nThreads) {
@@ -67,4 +75,95 @@ corePoolSize 设置为 0, maximumPoolSize 设置为 Integer.MAX_VALUE, 意味着
 ScheduledThreadPoolExecutor 继承与 ThreadPoolExecutor, 主要用于来在给定的延迟之后运行任务, 或定期执行任务; ScheduledThreadPoolExecutor 的功能与 Timer 类似, 但功能更强大, 更灵活; Timer 对应的是单个后台线程, ScheduledThreadPoolExecutor 可以在构造函数中指定多个对应的后台线程
 
 ##### ScheduledThreadPoolExecutor 的运行机制
-TODO 
+SingleThreadScheduledExecutor 的执行任意图如下  
+![SingleThreadScheduledExecutor执行任意图.png](http://ww1.sinaimg.cn/large/d8f31fa4gy1g6w78980qij20gr0aa0t1.jpg)  
+DelayQueue 是一个无界队列, 所以 ThreadPoolExecutor 的 maximumPoolSize 在 ScheduledThreadPoolExecutor 中是无意义的; 其执行主要分为两大部分
+- 调用 scheduleAtFixedRate() 或 scheduleWithFixedDelay() 时会向 DelayQueue 中添加一个实现了 RunnableScheduledFuture 接口的 ScheduledFutureTask
+- 线程池中的线程从 DelayQueue 中获取 ScheduledFutureTask, 然后执行任务
+
+##### ScheduledThreadPoolExecutor 的实现
+ScheduledFutureTask 主要包含三个成员变量
+- long 型的 time, 表示这个任务将要被执行的具体时间
+- long 型的 sequenceNumber, 表示这个任务被添加到 ScheduledThreadPoolExecutor 中的序号
+- long 型的成员变量 period, 表示任务执行的间隔周期
+
+DelayQueue 封装了一个 PriorityQueue, 这个 PriorityQueue 会对队列中的 ScheduledFutureTask 进行排序; 排序时 time 小的排在前面 (时间早的任务将被先执行); 如果两个 ScheduledFutureTask 的 time 相同, 就比较 sequenceNumber, sequenceNumber 小的排在前面; 下图为 ScheduledThreadPoolExecutor 中线程执行某个周期任务的四个步骤
+![ScheduledThreadPoolExecutor中线程执行某个周期任务的四个步骤.png](http://ww1.sinaimg.cn/large/d8f31fa4gy1g6w7se3xijj20fm09bgm5.jpg)
+- 线程 1 从 DelayQueue 中获取已到期的 ScheduledFutureTask (DelayQueue.take())
+- 线程 1 执行这个 ScheduledFutureTask
+- 线程 1 将这个 ScheduledFutureTask 的 time 修改为下次要被执行的时间
+- 线程 1 把这个修改 time 之后的 ScheduledFutureTask 放回 DelayQueue 中 (DelayQueue.add())
+
+DelayQueue.take() 方法实现如下
+```Java
+public E take() throws InterruptedException {
+    final ReentrantLock lock = this.lock;
+    lock.lockInterruptibly();  // 1
+    try {
+        for (;;) {
+            E first = q.peek();
+            if (first == null)
+                available.await();  // 2.1
+            else {
+                long delay = first.getDelay(NANOSECONDS);
+                if (delay <= 0)
+                    return q.poll();  // 2.2
+                first = null; // don't retain ref while waiting
+                if (leader != null)  
+                    available.await();
+                else {
+                    Thread thisThread = Thread.currentThread();
+                    leader = thisThread;
+                    try {
+                        available.awaitNanos(delay);  // 2.3
+                    } finally {
+                        if (leader == thisThread)
+                            leader = null;
+                    }
+                }
+            }
+        }
+    } finally {
+        if (leader == null && q.peek() != null)
+            available.signal();  // 2.3
+        lock.unlock();
+    }
+}
+```
+- 获取 lock
+- 获取周期任务
+  - fisrt 元素为空则等待
+  - fisrt 元素的不为空, 且 time 小于等于当前时间则返回 fisrt 元素
+  - fisrt 元素的不为空, 且 time 大于前时间则将 fisrt 置 null; 根据 leader 元素等待
+- 释放 Lock
+
+DelayQueue.add() 方法如下
+```Java
+public boolean add(E e) {
+    return offer(e);
+}
+
+public boolean offer(E e) {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        q.offer(e);
+        if (q.peek() == e) {
+            leader = null;
+            available.signal();
+        }
+        return true;
+    } finally {
+        lock.unlock();
+    }
+}
+```
+- 获取 lock
+- 添加任务
+  - 向队列中添加任务
+  - 如果添加的任务是头元素, 则唤醒在 Condition 中等待的线程
+- 释放 Lock
+
+#### FutureTask 详解
+Future 接口和实现 Future 接口的实现 FutureTask 类代表异步计算的结果
+##### FutureTask 间接

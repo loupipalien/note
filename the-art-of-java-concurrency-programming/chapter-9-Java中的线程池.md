@@ -57,10 +57,12 @@ new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQ
   - CallerRunsPolicy: 只用调用者所在线程来运行
   - DiscardOldestPolicy: 丢弃队列里最近的一个任务, 并执行当前任务
   - DiscardPolicy: 不处理, 丢弃掉
-- keepAliveTime (线程活动保持时间): 线程池的工作空闲后, 保持存活的时间 
+- keepAliveTime (线程活动保持时间): 线程池的工作空闲后, 保持存活的时间
 - TimeUnit (线程获得保持时间单位): 天, 小时, 分钟, 毫秒, 微秒, 纳秒  
+
 ##### 向线程池提交任务
-execute() 方法用于提交不需要返回值的任务; submit() 方法用于提交需要返回值的任务
+- execute(): 用于提交不需要返回值的任; 无法判断任务是否被线程池执行成功
+- submit(): 用于提交需要返回值的任务; 会返回一个 Future 类型对象判断任务是否成功
 
 ##### 关闭线程池
 可以通过调用线程池的 shutdown() 和 shutdownNow() 方法来关闭线程池; 它们的原理是遍历线程池中的线程, 然后逐个调用线程的 interrupt() 方法, 所以无法响应中断的任务可能永远都无法停止; 但这两个方法也是有区别的: shutdownNow() 首先将线程池的状态设置为 STOP, 然后尝试停止所有的正在执行或暂停任务的线程, 并返回等待执行的任务列表; shutdown() 只是将线程池的状态设置为 SHUTDOWN 状态, 然后中断没有执行任务的线程; 只要调用了这两个方法中的任意一个, isShutdown() 方法就会返回 true; 当所有的任务都关闭后, 才表示线程池关闭成功, 这时调用 isTerminated() 方法会返回 true
