@@ -210,10 +210,8 @@ private String executionTask(final String taskName) throws ExecutionException, I
 ```
 ##### FutureTask 的实现
 FutureTask 的实现基于 AbstractQueuedSynchronizer (AQS); 基于 AQS 实现的同步器包括: ReentrantLock, Semaphore, ReentrantReadWriteLock, CountDownLatch 和 FutureTask  
-基于 "复合优先于继承" 的原则, FutureTask 声明了一个内部私有的继承于 AQS 的子类 Sync, 对 FutureTask 所有共有方法的调用都会委托给这个内部子类; AQS 被作为 "模板方法模式" 的基础类提供给 FutureTask 的内部子类 Sync, 这个内部子类只需要实现状态检查和状态更新的方法即可, 这些方法将控制 FutureTask 的获取和释放操作; 具体来说, Sync 实现了 AQS 的 tryAcquireShared(int) 方法和 tryReleaseShared(int) 方法, Sync 通过这两个方法来检查和更新同步状态
-```
-
-```
+基于 "复合优先于继承" 的原则, FutureTask 声明了一个内部私有的继承于 AQS 的子类 Sync, 对 FutureTask 所有共有方法的调用都会委托给这个内部子类; AQS 被作为 "模板方法模式" 的基础类提供给 FutureTask 的内部子类 Sync, 这个内部子类只需要实现状态检查和状态更新的方法即可, 这些方法将控制 FutureTask 的获取和释放操作; 具体来说, Sync 实现了 AQS 的 tryAcquireShared(int) 方法和 tryReleaseShared(int) 方法, Sync 通过这两个方法来检查和更新同步状态  
+![FutureTask设计示意图.png](http://ww1.sinaimg.cn/large/d8f31fa4ly1g70h9lnsgnj20l50epgmk.jpg)  
 FutureTask.get() 方法会调用 acquireSharedInterruptibly(int arg) 方法, 这个方法执行过程如下
 - 这个方法首先会回调子类 Sync 中实现的 tryAcquireShared() 方法来判断 acquire 操作是否成功; 此操作可以成功的条件为: state 为执行完成状态 RAN 或已取消状态 CANCELLED, 且 runner 不为 null
 - 如果成功则 get() 方法立即放回, 如果失败则到线程等待队列中去等待其他线程执行 release 操作
