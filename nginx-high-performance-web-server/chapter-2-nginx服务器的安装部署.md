@@ -233,3 +233,88 @@ keepalive_requests number;
 可以在 http 块, server 块, location 块中进行配置, 默认值是 100
 
 ##### 配置网络监听
+配置监听使用指令 listen, 其配置方法主要有三种, 语法结构如下
+```
+# 第一种
+listen address[:port] [default_server] [setlib=number] [backlog=number] [rcvbuf=size] [sndbuf=size] [deferred] [accept_filter=filter] [bind] [ssl];
+
+# 第二种
+listen port [default_server] [setlib=number] [backlog=number] [rcvbuf=size] [sndbuf=size] [accept_filter=filter] [deferred] [bind] [ipv6only=on|off] [ssl];
+
+# 第三种
+listen unix:path [default_server] [backlog=number] [rcvbuf=size] [sndbuf=size] [accept_filter=filter] [deferred] [bind] [ssl];
+
+# address: IP 地址, 如果是 IPv6 的地址, 需要使用 "[]" 括起来
+# port: 端口号, 如果只定义了 IP 地址没有定义端口号, 就使用 80 端口
+# path: socket 文件路径, 如 /var/run/nginx.sock 等
+# default_server: 标识符, 将此虚拟主机设置为 address:port 的默认主机
+```
+
+##### 基于名称的虚拟主机配置
+这里的主机就是指 server 块对外提供的虚拟主机; 设置了主机的名称并配置好 DNS, 用户就可以使用这个名称向虚拟主机发送请求了; 其语法结构为
+```
+server_name name ...;
+```
+对于 name 来说可以只有一个名称, 也可以由多个名称并列, 之间用空格隔开; 每个名字就是一个域名, 由两端或者三段组成, 之间由点号 "." 隔开; 以下是一个简单的示例
+```
+server_name myserver.com www.myserver.com;
+```
+Nginx 规定, 第一个名称作为此虚拟主机的主要名称;  除此之外, name 还支持使用通配符 `*`, 但通配符只能用在由三段字符串组成名称的首段或尾段, 或者由两段字段组成的名称的尾段; 示例如下
+```
+server_name *.myserver.com www.myserver.*;
+```
+在 name 中还可以使用正则表达式, 并使用波浪号 `~` 作为正则表达式字符串的开始标记
+```
+server_name ~^www\+d\.myserver\.com$;
+```
+由于 name 支持使用通配符和正则表达式两种配置名称方式, 因此在包含多个虚拟主机的配置文件中, 可能会出现一个名称被多个虚拟主机的 name 匹配成功; Nginx 中对于匹配方式的不同, 按照以下优先级选择虚拟主机
+- 准确匹配 name 的
+- 通配符在开始时匹配 name 的
+- 通配符在结尾时匹配 name 的
+- 正则表达式匹配 name 的
+- 有多个同一优先级匹配 name 的, 首次匹配的生效
+
+##### 基于 IP 的虚拟主机匹配
+与基于名称的虚拟主机匹配类似, 只是 name 为 IP 地址, 也无需考虑通配符和正则的问题
+
+##### 配置 location 块
+Nginx 的官方文档中定义的 location 的语法结构为
+```
+location [ = | ~ | ~* | ^~ ] uri { ... }
+# 匹配前, 会将 uri 中的符号进行编码处理 (例如空格, 问号等)
+```
+其中 uri 变量是待匹配的请求字符串, 可以是不含正则表达式的字符串 (标准 uri), 也可以是包含正在表达式的字符串 (正则 uri);  在括号里的是可选项, 用来改变请求字符串与 uri 的匹配方式  
+在不添加可选项时, Nginx 首先在 server 块的多个 location 中搜索是否有标准 uri 和请求字符串匹配的, 如果有多个选择记录匹配度最高的, 然后再与 location 块中的正则 uri 匹配, 当第一个正则匹配则结束, 并使用这个 location 块处理请求, 如果正则全部匹配失败, 就使用刚才记录的匹配度最高的 location 块处理此请求  
+四个可选项的含义如下
+- `=`: 用于标准 uri 前, 要求请i去字符串与 uri 严格匹配, 如果匹配成功则使用此 location 块处理此请求
+- `~`: 用于表示 uri 包含正则表达式, 并区分大小写
+- `~*`: 用于表示 uri 包含正则表达式, 并不区分大小写
+- `^~`: 用于标准 uri 前, 表示找到标准 uri 和请求字符串匹配度最高的 location 后, 立即使用此 location 块处理请求, 不再继续搜索正则 uri 和请求字符串做匹配
+
+##### 配置请求的根目录
+Web 服务器接收到网络请求后, 首先要在服务器端指定目录中寻找请求资源; 在 Nginx 服务器中, 指令 root 就是用来配置这个根目录的, 其语法结构为
+```
+root path;
+```
+其中 path 为 Nginx 服务器接收到请求后查找资源的根目录路径; path 变量可以包含 Nginx 服务器预设的大多数变量, 只有 `$document_root` 和 `$realpath_root` 不可以使用; 此指令而可以在 http 块, server 块, location 块配置, 由于使用 Nginx 服务器多数情况下要配置多个 location 块对不同的请求分别做出处理, 因此通常配置在 location 块中
+```
+location /data/ {
+    root /locationtest1
+}
+```
+到 location 接收到 `/data/index.htm` 的请求时, 将在 /locationtest1/data/ 目录下找到 index.htm 响应请求
+
+##### 更改 location 的 URI
+在 location 块中, 除了使用 root 指令指明请求处理根目录, 还可以使用 alias 指令改变 location 接收到 URI 的请求路径, 其语法为
+```
+alias path;
+```
+path 为修改后的根路径, 同样也可以包含除了 `$document_root` 和 `$realpath_root` 之外的 Nginx 服务器预设变量
+```
+location ~^/data/(.+\.(html|htm))$ {
+    root /locationtest1/other/$1
+}
+```
+到 location 接收到 `/data/index.htm` 的请求, 匹配成功, 之后根据 alias 指令的配置, 将在 /locationtest1/other/ 目录下找到 index.htm 并响应请求
+
+##### 设置网站的默认首页
