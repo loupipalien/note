@@ -318,3 +318,75 @@ location ~^/data/(.+\.(html|htm))$ {
 到 location 接收到 `/data/index.htm` 的请求, 匹配成功, 之后根据 alias 指令的配置, 将在 /locationtest1/other/ 目录下找到 index.htm 并响应请求
 
 ##### 设置网站的默认首页
+Nginx 设置网站错误页面的指令为 error_page, 语法结构为
+```
+error_page code ... [=[response]] uri;
+# code: 要处理的 HTTP 错误代码
+# response: 可选项, 将 code 指定错误代码转为新的代码错误 response
+# uri: 错误页面的路径或者网站地址; 如果设置为路径, 则是以 Nginx 服务器安装路径下的 html 目录为根路径的相对路径; 如果设置为网址, 则 Nginx 服务器会直接访问该网址获取错误页面, 并返回给用户端
+```
+设置 Nginx 服务器使用 `${NGINX_HOME/html}/404.html` 页面响应 404 错误
+```
+error_page 404 /404.html
+```
+设置 Nginx 服务器产生 410 的 HTTP 消息时, 使用 `${NGINX_HOME/html}/empty.gif` 返回给用户表段 301 消息
+```
+error_page 410 =301 /empty.gif
+```
+如果不想将错误页面放在 Nginx 服务器的安装路径下, 那么可以使用一个 location 指令定向错误页面到新的路径下
+```
+error_page 404 /404.html
+...
+location /404.html {
+    root /myserver/errorpages/
+}
+```
+
+##### 基于 IP 配置的 Nginx 的访问权限
+Nginx 配置通过两种途径支持基本访问权限的控制, 一种是由 HTTP 标准模块支持的 ngx_http_access_module 支持的, 另一种是通过 IP 判断客户端是否有对 Nginx 的访问权限  
+- allow 指令, 用于设置允许访问 Nginx 的客户端 IP, 语法结构为
+```
+allow address | CIDR | all;
+# address: 允许访问的客户端 IP, 不支持同时设置多个, 如果有多个 IP 需要设置, 需要重复使用 allow 指令
+# CIDR: 允许访问的客户端的 CIDR 地址, 如 202.80.18.23/25
+# all: 允许所有客户端访问
+```
+- deny 指令, 用于设置禁止访问 Nginx 的客户端 IP
+```
+deny address | CIDR | all;
+# address: 禁止访问的客户端 IP, 不支持同时设置多个, 如果有多个 IP 需要设置, 需要重复使用 deny 指令
+# CIDR: 禁止访问的客户端的 CIDR 地址, 如 202.80.18.23/25
+# all: 禁止所有客户端访问
+```
+
+这两个指令可以在 http 块, server 块, location 块中配置; 以下示例
+```
+location / {
+    deny 192.168.1.1;
+    allow 192.168.1.0/24;
+    deny all;
+}
+```
+当有多个访问权限的配置时, 从上到下依次匹配, 遇到匹配的配置时就不再继续匹配
+
+##### 基于密码配置的 Nginx 的访问权限
+Nginx 还支持基于 HTTP Basic Authentication 协议的认证; 该协议是一种 HTTP 性质的认证办法, 需要识别用户名和密码, 认证失败的客户端不拥有访问 Nginx 服务器的权限; 该功能由 HTTP 标准模块 ngx_http_auth_basic_module 支持
+- auth_basic 指令, 用于开启或关闭该认证功能, 语法结构为
+```
+auth_basic string | off;
+# string: 开启该认证功能, 并配置验证时的指示信息
+# off: 关闭该认证功能
+```
+- auth_basic_user_file, 用于设置包含用户名和密码信息的文件路径
+```
+auth_basic_user_file file;
+```
+这里密码文件支持明文或加密后的文件, 其文件格式如下
+```
+name1:password1
+name2:password2:comment
+```
+加密密码可以使用 crypt() 函数进行密码加密的格式, Linux 平台可以使用 htpasswd 命令生成
+
+#### Nginx 服务器基础配置实例
+TODO
