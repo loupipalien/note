@@ -85,3 +85,69 @@ location / {
     ... # 上一层作用域的配置都有效
 }
 ```
+###### return 指令
+该指令用于完成对请求的处理, 直接项客户端返回响应状态代码; 处于该指令后的所有 Nginx 配置都是无效的; 该指令可以在 server, location, if 块中使用; 其语法有以下几种
+```
+return [text];
+return code URL;
+return URL;
+# code: 为返回给客户端的 HTTP 状态码
+# text: 为返回给客户端的响应体内容
+# URL: 为返回给客户端的 URL 地址
+```
+
+##### rewrite 指令
+该指令通过正则表达式的使用来改变 URL, 可以同时存在一个或多个指令, 按照顺序依次对 URL 进行匹配和处理; 该指令可以放在 server 块或者 location 块中, 其语法结构为
+```
+rewrite regex replacement [flag];
+# regex: 用于匹配 URI 的正则表达式 (regex 接收到的 URI 不包含 host 地址)
+# replacement: 匹配成功后用于替换 URI 中被截取内容的字符串
+# flag: 用来设置 rewrite 对 URI 的处理行为, 可以为以下标志中的一个
+    - last: 终止继续本 location 块中处理接收到的 URI, 并将此处重写的 URI 作为一个新的 URI, 使用各 location 块进行处理; 该标志将重写后的 URI 重新在 server 中执行, 为重写后的 URI 提供了转入到其他 location 块的机会
+    - break: 将此处重写的 URI 作为一个新的 URI, 在本科中继续进行处理
+    - redirect: 将重写后的 URI 返回给客户端, 状态码为 302, 指明是临时重定向的 URI
+    - permanent: 将重写后的 URI 返回给客户端, 状态码为 301, 指明是永久重定向的 URI
+```
+##### rewrite_log 指令
+该指令配置是开启 URL 重写日志的输出功能, 其语法结构为
+```
+rewrite_log on | off;
+```
+默认设置为 off, 如果配置为开启 (on), URL 重写的相关日志将以 notice 级别输出到 error_log 指令配置的日志文件中
+
+##### set 指令
+该指令用于设置一个新的变量, 其语法结构为
+```
+set variable value;
+# variable: 为变量的名称, 需要注意的是符号 '$' 作为变量的第一个字符
+# value: 为变量的值, 字符串或者其他变量或者变量的组合
+```
+##### uninitialized_variable_warn 指令
+该指令用于配置使用未初始化的变量, 是否记录警告日志, 其语法结构为
+```
+uninitialized_variable_warn on | off;
+```
+默认设置为开启状态
+
+##### Rewrite 常用全局变量
+TODO
+
+#### Rewrite 的使用
+ngx_http_rewrite_module 是 Nginx 服务器的重要模块之一, 它一方面实现了 URL 的重写功能, 另一方面为 Nginx 服务器提供了反向代理服务提供了支持
+
+##### 域名跳转
+通过 Rewrite 功能可以实现一级域名跳转, 也可以实现多级域名跳转  
+TODO
+##### 域名镜像
+镜像网站是指将完全相同的网站分别放在几个服务器上, 并分别使用独立的 URL, 其中一个服务器上的网站叫做主站, 其他的为镜像网站; 镜像网站个主站并没有太大区别, 镜像网站可以保存网页信息, 历史性数据, 平衡流量负载  
+TODO
+##### 独立域名
+当一个网站包含多个板块时, 可以为其中的某些板块设置独立域名  
+TODO
+
+##### 目录自动添加 `/`
+TODO
+##### 目录合并
+TODO
+##### 防盗链
+TODO
