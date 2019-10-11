@@ -246,3 +246,65 @@ proxy_cache_bypass string ...;
 proxy_cache_key string;
 ```
 Nginx 0.7.48 前为 `"$scheme$proxy_host$request_uri"`, 后为 `"$scheme$proxy_host$request_uri$is_args$args"`
+###### proxy_cache_lock 指令
+该指令用于设置是否开启缓存的锁功能, 在缓存中, 某些数据项可以同时被多个请求返回的响应数据填充; 开启该功能后, Nginx 服务器同时只能有一个请求填充缓存中的某一数据项, 这相当于给数据项上锁; 其他请求如果也想填充该项, 必须等待数据项的锁被释放; 这个等待时间由 proxy_cache_lock_timeout 指令配置
+```
+proxy_cache_lock on | off;
+```
+默认是关闭的
+###### proxy_cache_lock_timeout 指令
+该指令用于设置缓存的锁功能开启后锁的超时时间; 该指令的语法结构为
+```
+proxy_cache_lock_timeout time;
+```
+默认是 5s
+##### proxy_cache_min_uses 指令
+该指令用于设置客户端请求发送次数, 当客户端向代理服务器发送相同请求达到该指令设定的次数之后, Nginx 服务器才对请求的响应数据做缓存; 该指令的语法结构为
+```
+proxy_cache_min_uses number;
+```
+默认值为 1
+###### proxy_cache_path 指令
+该指令用于设置 Nginx 服务器存储缓存数据的路径以及和缓存缩影相关内容; 其语法结构为
+```
+proxy_cache_path path [levels=levels] keys_zone=name:size1 [inactive=time1] [max_size=size2] [Loader_files=number] [loader_sleep=time2] [loader_threshold=time3]
+# TODO
+```
+###### proxy_cache_use_stale 指令
+如果 Nginx 在访问被代理服务器过程中出现被代理的服务器无法访问或者访问错误等现象时, Nginx 服务器可以使用历史缓存响应客户端的请求; 该指令的语法结构为
+```
+proxy_cache_use_stale error | timeout | invalid_header | updating | http_500 | http_502 | http_503 | http_504 | http_404 | off ...;
+````
+默认值为 off
+###### proxy_cache_valid 指令
+该指令可以针对不同的 HTTP 响应状态设置不同的缓存时间, 其语法结构为
+```
+proxy_cache_valid [code ...] time;
+# code: 设置 HTTP 响应的状态代码
+# time: 设置缓存时间
+```
+###### proxy_no_cache 指令
+该指令用于配置在什么情况下都不适用 cache 功能; 其语法结构为
+```
+proxy_no_cache string ...;
+```
+当 string 不为空或不为 `0` 时不启用 cache 功能
+###### proxy_store 指令
+该指令配置是否在本地磁盘存来自被代理服务器的响应数据; 该指令的语法结构为
+```
+proxy_store on | off | string;
+# on | off: 设置是否开启 Proxy Store 功能
+# string: 自定义缓存文件的存放路径
+```
+###### proxy_store_access 指令
+该指令用于设置用户或用户组对 Proxy Store 缓存数据的访问权限; 其语法结构为
+```
+proxy_store_access users:permissions ...;
+# users: 可以设置为 user, group, all
+# permissions: 设置权限
+```
+
+#### Nginx 服务器的负载均衡
+Nginx 服务器反向代理服务的一个重要用途是实现负载均衡; 现在的负载均衡技术主要实现和作用于网络的第四层或第七层, 完全独立于网络基础硬件设备; Nginx 服务器实现的负载均衡一般认为是七层负载均衡
+
+TODO
