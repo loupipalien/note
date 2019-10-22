@@ -120,3 +120,76 @@ MySQL 的优化策略简单的分为两种: 静态优化和动态优化; 以下�
 ###### MySQL 如何执行关联查询
 利用嵌套循环和回溯的方式完成表关联查询, 将中间结果放在临时表中保存, 最后查询临时表 (全外连接不能利用嵌套循环和回溯的方式实现, MySQL 也不支持)
 ###### 执行计划
+TODO
+###### 关联查询优化器
+TODO
+###### 排序优化
+TODO
+
+##### 查询执行引擎
+在解析和优化阶段, MySQL 将生成查询对应的执行计划, MySQL 的查询执行引擎则根据这个执行计划来完成整个查询; 这里执行计划是一个数据结构, 而不是和很多其他的关系型数据库那样会生成对应的字节码
+##### 返回结果给客户端
+查询执行的最后一个阶段是将结果返回给客户端, 既是查询不需要返回结果集给客户端, MySQL 仍然会返回这个查询的一些信息, 如该查询影响到的行数; 如果查询可以被缓存, 那么 MySQL 在这个阶段也会将结果存放到查询缓存中  
+MySQL 将结果集返回客户端是一个增量, 逐步返回的过程; 这样处理有两个好处: 一是服务端无须存储太多的结果, 也就不会因为要返回太多结果而消耗太多内存; 二是这样处理可以让客户端第一时间获得返回的结果
+
+#### MySQL 查询优化器的局限性
+MySQL 的万能 "嵌套循环" 并不是对每种查询都是最优的, 不过还好只对少部分查询不适用; MySQL 5.6 版本后消除了很多 MySQL 原本的限制
+##### 关联子查询
+TODO
+##### UNION 的限制
+TODO
+##### 索引合并优化
+TODO
+##### 等值传递
+TODO
+##### 并行执行
+TODO
+##### 哈希关联
+TODO
+##### 松散索引扫描
+TODO
+##### 最大值和最小值优化
+TODO
+##### 在同一个表上查询和更新
+TODO
+
+#### 查询优化器的提示 (hint)
+如果对优化器选择的执行计划不满意, 可以使用优化器提供的几个提示 (hint) 来控制最终的执行计划; 以下是 MySQL 可以使用的一些提示
+- HIGH_PRIORITY, LOW_PRIORITY
+- DELAYED
+- STRAIGHT_JOIN
+- SQL_SMALL_RESULT, SQL_BIG_RESULT
+- SQL_BUFFER_RESULT
+- SQL_CACHE, SQL_NO_CACHE
+- SQL_CALC_FOUND_ROWS
+- FOR UPDATE 和 LOCK IN SHARE MODE
+- USE INDEX, IGNORE INDEX, FORCE INDEX
+- optimizer_search_depth
+- optimizer_prune_level
+- optimizer_switch
+
+#### 优化特定类型的查询
+
+##### 优化 COUNT() 查询
+TODO
+##### 优化关联查询
+- 确保 ON 或者 USING 子句中的列有索引
+- 确保任何的 GROUP BY 或者 ORDER BY 中的表达式值涉及到一个表中的列, 这样 MySQL 才有可能使用索引来优化这个过程
+- 当升级 MySQL 的时候需要注意: 关联语法, 运算符优先级等其他可能会发生变化的地方
+##### 优化子查询
+TODO
+##### 优化 GROUP BY 和 DISTINCT
+TODO
+##### 优化 LIMIT
+TODO
+##### 优化 SQL_CALC_FOUND_ROWS
+TODO
+##### 优化 UNION 查询
+TODO
+##### 静态查询分析
+TODO
+##### 使用用户自定义变量
+TODO
+
+#### 案例学习
+TODO
