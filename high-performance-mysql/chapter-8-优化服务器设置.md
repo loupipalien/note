@@ -33,3 +33,21 @@ TODO
 TODO
 
 #### 创建 MySQL 配置文件
+TODO
+#### 配置内存使用
+TODO
+#### 配置 MySQL 的 I/O 行为
+TODO
+#### 配置 MySQL 并发
+TODO
+#### 基于工作负载的配置
+TODO
+#### 完成基本配置
+TODO
+#### 安全和稳定设置
+TODO
+#### 高级 InnoDB 设置
+TODO
+
+#### 总结
+TODO
