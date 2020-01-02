@@ -31,7 +31,7 @@ class ComplexListNode {
 - 最后将链表按奇偶拆成两个链表, 其中一个为原始链表, 另一个为复制链表
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         // {1,2,3,4,5,3,5,#,2,#}

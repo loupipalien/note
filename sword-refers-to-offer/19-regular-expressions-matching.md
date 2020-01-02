@@ -18,11 +18,11 @@ tag: [algorithm]
 当模式中的第二个字符是 `'*'` 时
 - 如果字符串中的第一个字符和模式中的第一个字符匹配时, 有多种不同的移动方式
   - 字符串向后移动一个字符, 模式可以保持模式不变向, 也可以后移动两个字符
-- 如果字符串中的第一个字符和模式中的第一个字符不匹配或不匹配
+- 如果字符串中的第一个字符和模式中的第一个字符不匹配
   - 模式可以向后移动两个字符, 表示模式的第一个字符和 `'*'` 被忽略
 
 ##### 实现
-```
+```Java
 import java.util.Arrays;
 
 public class RegularExpressionsMatching {
@@ -40,39 +40,15 @@ public class RegularExpressionsMatching {
     }
 
     private static boolean regularExpressionsMatching(char[] str, char[] pattern) {
-        if (str ==  null || pattern == null ) {
-            return false;
-        }
+        if (str == null || pattern == null) return false;
+        if (pattern.isEmpty()) return str.isEmpty();
 
-        return match(str, pattern);
-    }
-
-    private static boolean match(char[] str, char[] pattern) {
-        if (str.length == 0) {
-             for (int i = 0; i < pattern.length; i++) {
-                 if (i % 2 == 1 && pattern[i] != '*') {
-                     return false;
-                 }
-             }
-             return pattern.length % 2 == 0 ? true : false;
-         }
-         if (str.length != 0 && pattern.length == 0) {
-             return false;
-         }
-
-        if (pattern.length > 1 && pattern[1] == '*') {
-            if (str[0] == pattern[0] || pattern[0] == '.') {
-                return match(Arrays.copyOfRange(str, 1, str.length), pattern)
-                        || match(Arrays.copyOfRange(str, 1, str.length), Arrays.copyOfRange(pattern, 2, pattern.length))
-                        || match(str, Arrays.copyOfRange(pattern, 2, pattern.length));
-            } else {
-                return match(str, Arrays.copyOfRange(pattern, 2, pattern.length));
-            }
+        boolean match = (!str.isEmpty() && (str.charAt(0) == pattern.charAt(0) || pattern.charAt(0) == '.'));
+        if (pattern.length() > 1 && pattern.charAt(1) == '*') {
+            return isMatch(str, pattern.substring(2)) || (match && isMatch(str.substring(1), pattern));
+        } else {
+            return match && isMatch(str.substring(1), pattern.substring(1));
         }
-        if (str[0] == pattern[0] || pattern[0] == '.') {
-            return match(Arrays.copyOfRange(str, 1, str.length), Arrays.copyOfRange(pattern, 1, pattern.length));
-        }
-        return false;
     }
 }
 ```
