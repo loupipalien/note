@@ -5,3 +5,8 @@
 - Java 中的锁有哪些以及区别
 - Java 的垃圾回收机制
 - volatile 关键字
+- Java 序列化
+- Java BitSet
+- Java ArrayListSpliterator
+- Java 中的 HashMap 的 size 为什么必须是 2 的指数
+- Java 中的 HashMap 的 hash 函数为什么这样[实现](https://www.zhihu.com/question/20733617/answer/111577937)
