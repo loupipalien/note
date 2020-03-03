@@ -454,3 +454,8 @@ final Node<K,V>[] resize() {
     return newTab;
 }
 ```
+- 将原有 `table, capacity, threshold` 保存
+- 计算扩容后的 `capacity, threshold`, 并初始化扩容后的 `table`
+- 当原有 `table` 不为 `null` 时
+  - 
+- 当原有 `table` 为 `null` 时则直接返回新的 `table`
