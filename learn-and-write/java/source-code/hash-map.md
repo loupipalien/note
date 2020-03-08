@@ -284,7 +284,8 @@ static final int hash(Object key) {
 - 高效性: 这里的计算量仅仅是 `key.hashCode()` 和与 `key.hashCode() >>> 6` 的异或操作, 可以说是相当高效的
 - 离散型: `key.hashCode() ^ (key.hashCode() >>> 16)` 为什么有更好的离散性见[这里](https://www.zhihu.com/question/20733617/answer/111577937)
 
-#### 添加单个元素  
+#### 添加元素
+##### 添加单个元素  
 ```Java
 /**
  * Associates the specified value with the specified key in this map.
@@ -367,6 +368,22 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent, boolean evict) {
 - 检查阈值, 如有必要则进行扩容
 - 执行节点插入的回调
 - 返回 `null`
+
+##### 添加多个元素
+```Java
+/**
+ * Copies all of the mappings from the specified map to this map.
+ * These mappings will replace any mappings that this map had for
+ * any of the keys currently in the specified map.
+ *
+ * @param m mappings to be stored in this map
+ * @throws NullPointerException if the specified map is null
+ */
+public void putAll(Map<? extends K, ? extends V> m) {
+    putMapEntries(m, true);
+}
+```
+和 `HashMap(Map<? extends K, ? extends V> m)` 构造方法一样都调用了 `putMapEntries(Map<? extends K, ? extends V> m, boolean evict)` 方法
 
 #### 扩容
 `resize()` 方法两倍扩容 `HashMap`, 实际上在构造方法中看到 `table` 数组并未初始化, 它是在 `resize()` 方法中进行初始化的, 所以该方法的另一个作用是: `初始化数组`
@@ -456,6 +473,286 @@ final Node<K,V>[] resize() {
 ```
 - 将原有 `table, capacity, threshold` 保存
 - 计算扩容后的 `capacity, threshold`, 并初始化扩容后的 `table`
-- 当原有 `table` 不为 `null` 时
-  - 
+- 当原有 `table` 不为 `null` 时, 则需要将原有 `table` 上的元素搬运到新的 `table`
+  - 遍历数组, 当数组节点不为 `null` 表示有元素
+    - 如果当前节点只有一个元素则直接复制给新 `table` 的对应位置即可
+    - 如果当前节点是红黑树节点, 则通过分裂红黑树处理
+    - 如果当前节点是链表, 则使用 `e.hash & oldCap == 0` 为判断结果分为高低位两个链表, 分别插入新 `table` 中的原下标 `i` 和新下标 `i + oldCap`
 - 当原有 `table` 为 `null` 时则直接返回新的 `table`
+
+#### 树化
+`treeifyBin(Node<K,V>[] tab, int hash)` 方法将 `hash` 对应的 `table` 位置的链表转换为红黑树
+```Java
+/**
+ * Replaces all linked nodes in bin at index for given hash unless
+ * table is too small, in which case resizes instead.
+ */
+final void treeifyBin(Node<K,V>[] tab, int hash) {
+    int n, index; Node<K,V> e;
+    if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
+        resize();
+    else if ((e = tab[index = (n - 1) & hash]) != null) {
+        TreeNode<K,V> hd = null, tl = null;
+        do {
+            TreeNode<K,V> p = replacementTreeNode(e, null);
+            if (tl == null)
+                hd = p;
+            else {
+                p.prev = tl;
+                tl.next = p;
+            }
+            tl = p;
+        } while ((e = e.next) != null);
+        if ((tab[index] = hd) != null)
+            hd.treeify(tab);
+    }
+}
+```
+- 如果 `table` 为 `null` 或者 `table` 长度小于 `MIN_TREEIFY_CAPACITY = 64` 时则进行 `resize()`, 因为 `resize()` 可以将一个位置上的链表分裂为到两个位置上
+- 否则将链表替换为 `TreeNode` 类型的节点链表, 然后进行树化
+
+在 `添加单个元素` 中, 可以看到每个位置的链表想要树化为红黑树, 则需要该位置上的链表长度大于等于 `TREEIFY_THRESHOLD = 8`, 至于为什么是 `8`, 可见 `HashMap` 类中的注释的实现要点, 在随机情况下 `hash` 的情况符合 [泊松分布](http://en.wikipedia.org/wiki/Poisson_distribution), 链表长度达到 `8` 的概率不到百万分之一, 所以在绝大多数情况下, 不太会出现链表转红黑树的情况; 另外 `TreeNode` 相比于 `Node` 来说会有两倍的空间占用, 在长度较小的情况下, 红黑树的查找性能和链表是差别不大的; 最后需要注意的是 `UNTREEIFY_THRESHOLD = 6` 时才将红黑树退化为链表
+
+#### 查找元素
+```Java
+/**
+ * Returns the value to which the specified key is mapped,
+ * or {@code null} if this map contains no mapping for the key.
+ *
+ * <p>More formally, if this map contains a mapping from a key
+ * {@code k} to a value {@code v} such that {@code (key==null ? k==null :
+ * key.equals(k))}, then this method returns {@code v}; otherwise
+ * it returns {@code null}.  (There can be at most one such mapping.)
+ *
+ * <p>A return value of {@code null} does not <i>necessarily</i>
+ * indicate that the map contains no mapping for the key; it's also
+ * possible that the map explicitly maps the key to {@code null}.
+ * The {@link #containsKey containsKey} operation may be used to
+ * distinguish these two cases.
+ *
+ * @see #put(Object, Object)
+ */
+public V get(Object key) {
+    Node<K,V> e;
+    return (e = getNode(hash(key), key)) == null ? null : e.value;
+}
+
+/**
+ * Implements Map.get and related methods
+ *
+ * @param hash hash for key
+ * @param key the key
+ * @return the node, or null if none
+ */
+final Node<K,V> getNode(int hash, Object key) {
+    Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
+    if ((tab = table) != null && (n = tab.length) > 0 &&
+        (first = tab[(n - 1) & hash]) != null) {
+        if (first.hash == hash && // always check first node
+            ((k = first.key) == key || (key != null && key.equals(k))))
+            return first;
+        if ((e = first.next) != null) {
+            if (first instanceof TreeNode)
+                return ((TreeNode<K,V>)first).getTreeNode(hash, key);
+            do {
+                if (e.hash == hash &&
+                    ((k = e.key) == key || (key != null && key.equals(k))))
+                    return e;
+            } while ((e = e.next) != null);
+        }
+    }
+    return null;
+}
+```
+`get(Object key)` 主要调用 `getNode(int hash, Object key)` 方法实现
+- 查找 `hash` 在 `table` 上对应位置的节点 `first`
+  - 如果 `first` 就是要找的节点则直接返回
+  - 如果 `first` 是 `TreeNode` 类型节点则在红黑树中查找
+  - 如果 `first` 是链表的头节点则遍历链表查找
+- 如果 `table` 为 `null` 或空, 或者 `first` 为 `null` 则直接返回
+
+`containsKey(Object key)` 方法也是基于 `getNode(int hash, Object key)` 实现的, `containsValue(Object value)` 方法则是变量 `table` 以及每个位置上的链表或红黑树实现的
+
+#### 清空
+```Java
+/**
+ * Removes all of the mappings from this map.
+ * The map will be empty after this call returns.
+ */
+public void clear() {
+    Node<K,V>[] tab;
+    modCount++;
+    if ((tab = table) != null && size > 0) {
+        size = 0;
+        for (int i = 0; i < tab.length; ++i)
+            tab[i] = null;
+    }
+}
+```
+将 `table` 数组的每个位置置 `null` 即可
+
+#### 序列化
+```Java
+/**
+ * Save the state of the <tt>HashMap</tt> instance to a stream (i.e.,
+ * serialize it).
+ *
+ * @serialData The <i>capacity</i> of the HashMap (the length of the
+ *             bucket array) is emitted (int), followed by the
+ *             <i>size</i> (an int, the number of key-value
+ *             mappings), followed by the key (Object) and value (Object)
+ *             for each key-value mapping.  The key-value mappings are
+ *             emitted in no particular order.
+ */
+private void writeObject(java.io.ObjectOutputStream s)
+    throws IOException {
+    int buckets = capacity();
+    // Write out the threshold, loadfactor, and any hidden stuff
+    s.defaultWriteObject();
+    s.writeInt(buckets);
+    s.writeInt(size);
+    internalWriteEntries(s);
+}
+
+// These methods are also used when serializing HashSets
+final float loadFactor() { return loadFactor; }
+final int capacity() {
+    return (table != null) ? table.length :
+        (threshold > 0) ? threshold :
+        DEFAULT_INITIAL_CAPACITY;
+}
+
+// Called only from writeObject, to ensure compatible ordering.
+void internalWriteEntries(java.io.ObjectOutputStream s) throws IOException {
+    Node<K,V>[] tab;
+    if (size > 0 && (tab = table) != null) {
+        for (int i = 0; i < tab.length; ++i) {
+            for (Node<K,V> e = tab[i]; e != null; e = e.next) {
+                s.writeObject(e.key);
+                s.writeObject(e.value);
+            }
+        }
+    }
+}
+```
+- 获取 `table` 数组的大小、
+- 写入非静态属性, 非 `transient` 属性
+- 写入 `table` 数组的大小
+- 写入 `key-value` 键值对的数量
+- 写入具体的 `key-value` 键值对
+
+#### 反序列化
+```Java
+/**
+ * Reconstitute the {@code HashMap} instance from a stream (i.e.,
+ * deserialize it).
+ */
+private void readObject(java.io.ObjectInputStream s)
+    throws IOException, ClassNotFoundException {
+    // Read in the threshold (ignored), loadfactor, and any hidden stuff
+    s.defaultReadObject();
+    reinitialize();
+    if (loadFactor <= 0 || Float.isNaN(loadFactor))
+        throw new InvalidObjectException("Illegal load factor: " +
+                                         loadFactor);
+    s.readInt();                // Read and ignore number of buckets
+    int mappings = s.readInt(); // Read number of mappings (size)
+    if (mappings < 0)
+        throw new InvalidObjectException("Illegal mappings count: " +
+                                         mappings);
+    else if (mappings > 0) { // (if zero, use defaults)
+        // Size the table using given load factor only if within
+        // range of 0.25...4.0
+        float lf = Math.min(Math.max(0.25f, loadFactor), 4.0f);
+        float fc = (float)mappings / lf + 1.0f;
+        int cap = ((fc < DEFAULT_INITIAL_CAPACITY) ?
+                   DEFAULT_INITIAL_CAPACITY :
+                   (fc >= MAXIMUM_CAPACITY) ?
+                   MAXIMUM_CAPACITY :
+                   tableSizeFor((int)fc));
+        float ft = (float)cap * lf;
+        threshold = ((cap < MAXIMUM_CAPACITY && ft < MAXIMUM_CAPACITY) ?
+                     (int)ft : Integer.MAX_VALUE);
+
+        // Check Map.Entry[].class since it's the nearest public type to
+        // what we're actually creating.
+        SharedSecrets.getJavaOISAccess().checkArray(s, Map.Entry[].class, cap);
+        @SuppressWarnings({"rawtypes","unchecked"})
+            Node<K,V>[] tab = (Node<K,V>[])new Node[cap];
+        table = tab;
+
+        // Read the keys and values, and put the mappings in the HashMap
+        for (int i = 0; i < mappings; i++) {
+            @SuppressWarnings("unchecked")
+                K key = (K) s.readObject();
+            @SuppressWarnings("unchecked")
+                V value = (V) s.readObject();
+            putVal(hash(key), key, value, false, false);
+        }
+    }
+}
+
+/**
+ * Reset to initial default state.  Called by clone and readObject.
+ */
+void reinitialize() {
+    table = null;
+    entrySet = null;
+    keySet = null;
+    values = null;
+    modCount = 0;
+    threshold = 0;
+    size = 0;
+}
+```
+- 读取非静态属性, 非 `transient` 属性
+- 重初始化 `HashMap` 的属性值
+- 校验 `loadFactor` 参数
+- 读取 `table` 数组的大小
+- 读取 `key-value` 键值对的 `size`
+- 检验 `size` 参数
+- 计算 `loadFactor`, 约束在 `0.25 ~ 4.0` 之间
+- 计算需要 `table` 容量
+- 计算 `threshold` 阈值
+- 创建 `table` 数组
+- 读物键值对放入 `HashMap` 中
+
+#### 克隆
+```Java
+/**
+ * Returns a shallow copy of this <tt>HashMap</tt> instance: the keys and
+ * values themselves are not cloned.
+ *
+ * @return a shallow copy of this map
+ */
+@SuppressWarnings("unchecked")
+@Override
+public Object clone() {
+    HashMap<K,V> result;
+    try {
+        result = (HashMap<K,V>)super.clone();
+    } catch (CloneNotSupportedException e) {
+        // this shouldn't happen, since we are Cloneable
+        throw new InternalError(e);
+    }
+    result.reinitialize();
+    result.putMapEntries(this, false);
+    return result;
+}
+```
+克隆方法的实现相当简单, 需要注意的是 `key-value` 键值对是浅克隆
+
+#### 小结
+- `HashMap` 的默认容量是 `16 (1 << 4)`, 每次超过阈值就按照两倍大小进行自动扩容, 所以容量总是 `2^N`
+- `HashMap` 的底层 `table` 数组是延迟初始化的, 在首次添加 `key-value` 键值对时才进行初始化
+- `HashMap` 的默认加载因子是 `0.75`, 如果已知 `HashMap` 的大小, 则正确设置容量和加载因子会减少扩容的次数
+- `HashMap` 每个槽位在满足以下两个条件时, 可以进行树化为红黑树, 避免槽位是链表数据结构时, 链表结构过长而导致查找性能变慢
+  - 条件一: `HashMap` 的 `table` 数组大于等于 64
+  - 条件二： 槽位链表长度大于等于 8 (选择 8 作为阈值的原因是在泊松分布下, 链长为 8 的概率不足百万分之一, 另外在槽位的红黑树节点数量小于 6 时会退化为链表
+- `HashMap` 的查找和添加 `key-value` 键值对的平均复杂度为 `O(1)`
+  - 对于槽位是链表的节点时, 平均时间复杂度为 `O(k)`, 其中 `k` 为链表的长度
+  - 对于槽位是红黑树的节点时, 平均时间复杂度为 `O(logk)`, 其中 `k` 为红黑树节点的个数
+
+>**参考:**
+- [集合（三）哈希表 HashMap](http://svip.iocoder.cn/JDK/Collection-HashMap/)
+- [Java 8系列之重新认识HashMap](https://zhuanlan.zhihu.com/p/21673805)

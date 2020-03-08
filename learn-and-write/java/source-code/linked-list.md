@@ -967,3 +967,6 @@ public ListIterator<E> listIterator(int index) {
 - `LinkedList` 可以提供栈, 队列, 双端队列的功能
 - `LinkedList` 随机访问平均时间复杂度为 O(n), 查找指定元素的平均时间复杂度是 O(n)
 - `LinkedList` 移除指定位置的元素的最好时间复杂度是 O(1), 最坏时间复杂度是 O(1), 平均时间复杂度是 O(n)
+
+>**参考:**
+- [集合（二）链表 LinkedList](http://svip.iocoder.cn/JDK/Collection-LinkedList/)

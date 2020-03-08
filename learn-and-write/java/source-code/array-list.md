@@ -853,3 +853,6 @@ public void add(E e) {
 #### 小结
 - `ArrayList` 是基于数组的 `List` 实现类, 支持在数组容量不够时, 一般按照 1.5 倍自动扩容; 同时它支持手动扩容和手动缩容。
 - `ArrayList` 随机访问时间复杂度是 `O(1)`, 查找指定元素的平均时间复杂度是 `O(n)`
+
+>**参考:**
+- [集合（一）数组 ArrayList](http://svip.iocoder.cn/JDK/Collection-ArrayList/)
