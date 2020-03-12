@@ -21,7 +21,7 @@ j  d  e  h
 由于路径不能重复进入矩阵的格子, 所以还需要定义和字符矩阵大小一样的布尔值矩阵, 用于标识路径是否已经进入了每个格子  
 
 ##### 实现
-```
+```Java
 public class StringPathInMatrix {
     public static void main(String[] args) {
         char[] matrix = {'a', 'b', 't', 'g', 'c', 'f', 'c', 's', 'j', 'd', 'e', 'h'};
@@ -40,40 +40,30 @@ public class StringPathInMatrix {
             throw new IllegalArgumentException("Invalid Parameters.");
         }
 
-        int pathLength = 0;
         boolean[] visited = new boolean[rows * cols];
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
-                if (hasPath(matrix, rows, cols, str, i, j, pathLength, visited)) {
-                    return true;
-                }
+                if (hasPath(matrix, rows, cols, str, i, j, 0, visited)) return true;
             }
         }
         return false;
     }
 
-    private static boolean hasPath(char[] matrix, int rows, int cols, char[] str, int row, int col, int pathLength, boolean[] visited) {
-        if (pathLength == str.length) {
-            return true;
-        }
+    private static boolean hasPath(char[] matrix, int rows, int cols, char[] str, int row, int col, int length, boolean[] visited) {
+        if (length == str.length) return true;
 
         boolean hasPath = false;
         // 判定当前格子
         if (row >= 0 && row < rows && col >= 0 && col < cols
-                && matrix[row * cols + col] == str[pathLength]
+                && matrix[row * cols + col] == str[length++]
                 && !visited[row * cols + col]) {
-            pathLength++;
             visited[row * cols + col] = true;
             // 相邻格子: [row, col + 1], [row + 1, col], [row, col -1], [row - 1, col]
-            hasPath = hasPath(matrix, rows, cols, str, row, col + 1, pathLength, visited)
-                    || hasPath(matrix, rows, cols, str, row + 1, col, pathLength, visited)
-                    || hasPath(matrix, rows, cols, str, row, col - 1, pathLength, visited)
-                    || hasPath(matrix, rows, cols, str, row - 1, col, pathLength, visited);
-
-            if (!hasPath) {
-                pathLength--;
-                visited[row * cols + col] = false;
-            }
+            hasPath = hasPath(matrix, rows, cols, str, row, col + 1, length, visited)
+                    || hasPath(matrix, rows, cols, str, row + 1, col, length, visited)
+                    || hasPath(matrix, rows, cols, str, row, col - 1, length, visited)
+                    || hasPath(matrix, rows, cols, str, row - 1, col, length, visited);
+            if (!hasPath) visited[row * cols + col] = false;
         }
         return hasPath;
     }
