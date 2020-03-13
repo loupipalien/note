@@ -15,9 +15,7 @@ tag: [algorithm]
 由于没有规定 n 的大小, 那么当 n 很大的时候, 最大的 n 位数必然超过了 int 和 long 型的数字大小, 所以考虑使用字符串来表示; 使用长度为 n 的 char 数组, 先将其所有元素初始化为 `'0'` 初始化, 然后从 1 自增到最大的 n 位数; 这里的字符数组需要模拟自增的操作, 最终打印时要考虑避免打印出前缀 `0`
 
 ##### 实现
-```
-import java.util.Arrays;
-
+```Java
 public class PrintOneToMaxOfNDigits {
     public static void main(String[] args) {
         printOneToMaxOfNDigits(3);
@@ -79,10 +77,7 @@ public class PrintOneToMaxOfNDigits {
 
 #### 优化
 换一种思路考虑顺序打印 1 到最大的 n 位数: n 位所有的十进制数就是 n 个 0 到 9 数字的全排列; 也就是说把数字的每一位从 0 到 9 排列一遍就得到了所有的十进制数, 然后将其打印即可
-```
-
-import java.util.Arrays;
-
+```Java
 public class Solution {
     public static void main(String[] args) {
         printOneToMaxOfNDigits(1);

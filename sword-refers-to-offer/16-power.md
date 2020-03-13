@@ -18,7 +18,7 @@ tag: [algorithm]
 - 非零数的负数次幂为对应正数次幂的倒数
 
 ##### 实现
-```
+```Java
 public class Power {
     public static void main(String[] args) {
         System.out.println(power(10, 5));
@@ -62,7 +62,7 @@ a^{(n-1)/2} * a^{(n-1)/2} * a, & \text{n 为奇数}
 \end{cases}
 $$
 使用以上公式实现如下
-```
+```Java
 public class Power {
     public static void main(String[] args) {
         System.out.println(power(0.001d, 3));

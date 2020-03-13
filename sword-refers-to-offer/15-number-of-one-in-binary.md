@@ -15,7 +15,7 @@ tag: [algorithm]
 先判断整数二进制表示中最右边一位是不是 1; 接着把输入的整数右移一位, 此时原来处于从右边数起的第二位被移到最右边, 在判断是不是 1; 如此循环直到整数为 0
 
 ##### 实现
-```
+```Java
 public class NumberOfOneInBinary {
     public static void main(String[] args) {
         System.out.println(numberOfOneInBinary(0x80000000));
@@ -35,7 +35,7 @@ public class NumberOfOneInBinary {
 }
 ```
 如果不想改变原有数字的值, 可以使用 flag 和左移实现
-```
+```Java
 public class NumberOfOneInBinary {
     public static void main(String[] args) {
         System.out.println(numberOfOneInBinary(0x80000000));
