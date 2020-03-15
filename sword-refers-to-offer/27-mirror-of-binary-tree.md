@@ -10,7 +10,7 @@ tag: [algorithm]
 
 #### 题目一
 请完成一个函数, 输入一颗二叉树, 该函数输出它的镜像; 二叉树节点的定义如下
-```
+```Java
 class BinaryTreeNode {
     double value;
     BinaryTreeNode left;
@@ -22,7 +22,7 @@ class BinaryTreeNode {
 从根节点开始, 如果有孩子节点, 则将两个孩子节点左右互换, 然后再将两个孩子节点作为根节点, 循环上述过程, 直到根节点没有孩子为止
 
 ##### 实现
-```
+```Java
 public class MirrorOfBinaryTree {
     public static void main(String[] args) {
         BinaryTreeNode node = new BinaryTreeNode(8)
@@ -36,20 +36,14 @@ public class MirrorOfBinaryTree {
     }
 
     private static void mirrorOfBinaryTree(BinaryTreeNode root) {
-            if (root == null) {
-                return;
-            }
+        if (root == null) return root;
 
-            BinaryTreeNode temp = root.left;
-            root.left = root.right;
-            root.right = temp;
-            if (root.left != null) {
-                mirrorOfBinaryTree(root.left);
-            }
-            if (root.right != null) {
-                mirrorOfBinaryTree(root.right);
-            }
-        }
+        BinaryTreeNode left = root.left;
+        BinaryTreeNode right = root.right;
+        root.left = mirrorTree(right);
+        root.right = mirrorTree(left);
+        return root;
+    }
 
     private static class BinaryTreeNode {
         double value;

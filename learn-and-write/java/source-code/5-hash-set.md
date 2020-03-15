@@ -1,5 +1,5 @@
 ### HashSet
-`HashSet` 是基于 `HashMap` 的 Set 实现类; 有排重的需求可以考虑使用 `HashSet`
+`HashSet` 是基于 `HashMap` 的 `Set` 实现类; 有排重的需求可以考虑使用 `HashSet`
 
 #### 类图
 `HashSet` 实现的接口和继承的抽象类如下图  

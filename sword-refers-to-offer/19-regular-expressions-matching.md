@@ -39,14 +39,21 @@ public class RegularExpressionsMatching {
         System.out.println(regularExpressionsMatching(str, pattern4));
     }
 
-    private static boolean regularExpressionsMatching(char[] str, char[] pattern) {
+    private static boolean regularExpressionsMatching(String str, String pattern) {
         if (str == null || pattern == null) return false;
         if (pattern.isEmpty()) return str.isEmpty();
 
         boolean match = (!str.isEmpty() && (str.charAt(0) == pattern.charAt(0) || pattern.charAt(0) == '.'));
         if (pattern.length() > 1 && pattern.charAt(1) == '*') {
+            /**
+             * 当 pattern 的第二个字符为 * 时, str.charAt(0) 与 pattern.charAt(0) 匹配与不匹配都可以将 pattern 向后移动两个字符
+             * 当 pattern 的第二个字符为 * 时, str.charAt(0) 与 pattern.charAt(0) 时, 将 str 向后移一个字符
+             */
             return isMatch(str, pattern.substring(2)) || (match && isMatch(str.substring(1), pattern));
         } else {
+            /**
+             * 当 pattern 的长度等于 1 时, 或者 pattern 的第二个字符不等于 * 时
+             */
             return match && isMatch(str.substring(1), pattern.substring(1));
         }
     }

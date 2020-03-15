@@ -18,7 +18,7 @@ tag: [algorithm]
 - 如果包含指数部分则接下来是 `e` 或者 `E`, 再继续扫描指数部分
 
 ##### 实现
-```
+```Java
 import java.util.Arrays;
 
 public class NumbericStrings {

@@ -10,7 +10,7 @@ tag: [algorithm]
 
 #### 题目一
 输入两颗二叉树 A 和 B, 判断 B 是不是 A 的子结构; 二叉树节点定义如下
-```
+```Java
 class BinaryTreeNode {
     double value;
     BinaryTreeNode left;
@@ -24,7 +24,7 @@ class BinaryTreeNode {
 - 判断树 A 以 R 为根节点的子树是不是包含和树 B 一样的结构
 
 ##### 实现
-```
+```Java
 public class SubStructureInTree {
     public static void main(String[] args) {
         BinaryTreeNode node4 = new BinaryTreeNode(4);
@@ -59,7 +59,7 @@ public class SubStructureInTree {
         if (subTreeRoot == null) {
             return true;
         }
-        if (root == null ) {
+        if (root == null) {
             return false;
         }
         if (Double.compare(root.value, subTreeRoot.value) != 0) {

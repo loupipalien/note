@@ -16,7 +16,7 @@ tag: [algorithm]
 可以换一种思路, 通过交换来达到目的: 维护两个指针, 一个从头开始遍历, 遇到一个偶数时停下, 另一个从尾遍历, 遇到一个奇数是停下, 交换这两个元素, 循环这个过程直到两个指针相遇
 
 ##### 实现
-```
+```Java
 public class ReorderArray {
     public static void main(String[] args) {
         int[] array = new int[]{1, 2, 3, 4, 5, 6, 7};
