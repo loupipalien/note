@@ -36,7 +36,7 @@ tag: [algorithm]
 这里出错是因为下一个弹出的是 1, 但 1 不在栈顶, 压栈序列的数字都已入栈; 操作无法继续
 
 ##### 实现
-```
+```Java
 import java.util.Stack;
 
 public class IsPopOrder {
@@ -49,25 +49,18 @@ public class IsPopOrder {
     }
 
     private static boolean isPopOrder(int[] push, int[] pop) {
-        if (push == null || pop == null || push.length != pop.length) {
-            return false;
-        }
+        if (pushed == null || popped == null || pushed.length != popped.length) return false;
 
-        int i = 0, j = 0;
-        Stack<Integer> stack = new Stack();
-        while (j < pop.length) {
-            if (!stack.isEmpty() && stack.peek() == pop[j]) {
-                stack.pop();
+        int size = 0;
+        int[] stack = new int[pushed.length];
+        for (int i = 0, j = 0; i < pushed.length; i++) {
+            stack[size++] = pushed[i];
+            while (size > 0 && stack[size - 1] == popped[j]) {
+                size--;
                 j++;
-            } else {
-                if (i < push.length) {
-                    stack.push(push[i++]);
-                } else {
-                    return false;
-                }
             }
         }
-        return true;
+        return size == 0;
     }
 }
 ```
