@@ -26,7 +26,7 @@ class BinaryTreeNode {
 由于要遍历二叉树的节点的, 而且首先要变量根节点, 所以选择前序遍历; 在这里使用栈来保存已访问的路径的节点, 到变量到叶子节点时, 计算栈中的路径值的和是否与输入整数相同
 
 ##### 实现
-```
+```Java
 import java.util.Stack;
 
 public class Solution {

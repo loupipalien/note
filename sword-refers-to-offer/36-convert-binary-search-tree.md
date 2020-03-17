@@ -31,7 +31,7 @@ class BinaryTreeNode {
 对二叉搜索树使用中序遍历, 左子树, 根节点, 右子树是双向链表的三个部分, 先将左子树都转换为排序双向链表, 将链表的尾节点和根节点连接起来得到新的双向链表, 再将新双向链表的尾节点与右子树的头节点连接起来, 这样转换就得到了排序双向链表
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         BinaryTreeNode root = new BinaryTreeNode(10)

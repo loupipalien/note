@@ -34,31 +34,33 @@ public class Solution {
     }
 
     private static boolean sequenceOfBST(int[] sequence) {
-        if (sequence == null || sequence.length < 1) {
-            return false;
-        }
+        if (sequence == null) return false;
+        if (sequence.length <= 1) return true;
 
         int root = sequence[sequence.length - 1];
         // 确定右子树根节点位置
-        int rightChildrenStartIndex = -1;
+        int rightStartIndex = sequence.length - 1;
         for (int i = 0; i < sequence.length - 1; i++) {
             if (sequence[i] > root) {
-                rightChildrenStartIndex = i; break;
+                rightStartIndex = i;
+                break;
             }
         }
 
         // 将根节点的右子树中的节点与根节点比较
-        for (int i = rightChildrenStartIndex; i > -1 && i < sequence.length - 1; i++) {
-            if (sequence[i] < root) {
-                return false;
-            }
+        for (int i = rightStartIndex; i < sequence.length - 1; i++) {
+            if (sequence[i] < root) return false;
         }
 
-        if (rightChildrenStartIndex > 0 && rightChildrenStartIndex < sequence.length - 1) {
-            return sequenceOfBST(Arrays.copyOfRange(sequence, 0, rightChildrenStartIndex))
-                    && sequenceOfBST(Arrays.copyOfRange(sequence, rightChildrenStartIndex, sequence.length - 1));
+        boolean left = true;
+        if (rightStartIndex > 0) {
+            left = recursive(Arrays.copyOfRange(sequence, 0, rightStartIndex));
         }
-        return true;
+        boolean right = true;
+        if (rightStartIndex < sequence.length - 1) {
+            right = recursive(Arrays.copyOfRange(sequence, rightStartIndex, sequence.length - 1));
+        }
+        return left && right;
     }
 }
 ```
