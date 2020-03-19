@@ -19,7 +19,7 @@ tag: [algorithm]
 - 当 n 为个数时, 等于 0 时返回 0, 非 0 时返回 1
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         System.out.println(numberOfOne(12));

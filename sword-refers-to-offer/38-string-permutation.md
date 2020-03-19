@@ -15,7 +15,7 @@ tag: [algorithm]
 这里把一个字符串看作两个部分: 第一部分是它的第一个字符, 第二部分是后面的所有字符; 为了求整个字符串的排列, 第一步求所有可能出现在第一个位置的字符, 第二步是固定一个字符求后面所有字符的排列组合
 
 ##### 实现
-```
+```Java
 import java.util.*;
 
 public class Solution {
@@ -57,7 +57,6 @@ public class Solution {
         }
         return new ArrayList<>(result);
     }
-
 
     private static String toString(List<String> list) {
         StringBuilder builder = new StringBuilder("");

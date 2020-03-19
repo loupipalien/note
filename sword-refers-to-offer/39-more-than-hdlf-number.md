@@ -23,7 +23,7 @@ TODO
 TODO
 
 - 根据数组特点找出时间复杂度为 $O(n)$ 的算法
-```
+```Java
 public class MoreThanHalfNumber {
     public static void main(String[] args) {
         System.out.println(moreThanHalfNumber(new int[]{1, 2, 3, 2, 2, 2, 5, 4, 2}));

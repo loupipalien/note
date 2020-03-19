@@ -30,7 +30,7 @@ tag: [algorithm]
 
 ##### 实现
 - 举例分析数组的规律
-```
+```Java
 public class GreatestSumOfSubarrays {
     public static void main(String[] args) {
         System.out.println(greatestSumOfSubarrays(new int[]{1, -2, 3, 10, -4, 7, 2, -5}));
