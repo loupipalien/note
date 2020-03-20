@@ -15,7 +15,7 @@ tag: [algorithm]
 0 - 9 这 10 个数字各占一位, 10 - 99 这 90 这数字各占 2 位, 100 - 999 这 900 个数字个占 3 位, 以此类推; 要获取第 n 位对应的数字, 先定位到某个数字区间, 再算出为此数字区间的第多少位数, 即可推算出为几
 
 ##### 实现
-```
+```Java
 public class DigitsInSequence {
     public static void main(String[] args) {
         System.out.println(digitsInSequence(1001));

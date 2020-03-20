@@ -15,7 +15,7 @@ tag: [algorithm]
 根据题目要求, 两个数字 m 和 n 能拼接成数字 mn 和 nm, 如果 nm < mn, 那么我们打印出 nm, 即 m 应该排在 n 的前面, 此时定义 m 小于 n; 反之同理
 
 ##### 实现
-```
+```Java
 import java.util.Arrays;
 
 public class Solution {
