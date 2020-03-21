@@ -22,7 +22,7 @@ tag: [algorithm]
 中序遍历二叉搜索树, 遍历序列的数值是递增排序的; 所以使用中序遍历, 很容易找到第 k 大的节点
 
 ##### 实现
-```
+```Java
 import java.util.ArrayList;
 import java.util.List;
 

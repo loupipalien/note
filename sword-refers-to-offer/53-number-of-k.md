@@ -17,7 +17,7 @@ tag: [algorithm]
 可以利用二分查找法在排序数组中找到第一次出现指定数出现的下标, 同理也找到最后出现的下标, 这样的时间复杂度为 $O(logn)$
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         int[] array = {1, 2, 3, 3, 3, 3, 4, 5};
@@ -93,7 +93,7 @@ public class Solution {
 TODO
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         int[] array = {0, 1, 2, 3, 4, 5, 6};
@@ -136,7 +136,7 @@ public class Solution {
 TODO
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         int[] array = {-3, -1, 1, 3, 5};

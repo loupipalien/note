@@ -15,7 +15,7 @@ tag: [algorithm]
 定义两个指针, `ahead` 从前向后遍历, `behind` 从后向前遍历; 当两个数的和大于 s, `behind` 向前移动, 当两个数的和小于 s, `ahead` 向后移动
 
 ##### 实现
-```
+```Java
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,7 +56,7 @@ public class Solution {
 使用两个指针 start, end 指向连续正数序列的起始, 当连续正数序列的和小于指定值则 end 指针后移一位, 如果连续正数序列的和大于指定的值则 start 指针后移一位, 相等时则保存序列; 当 start 值大于等于指定值的一半时停止
 
 ##### 实现
-```
+```Java
 import java.util.ArrayList;
 import java.util.List;
 

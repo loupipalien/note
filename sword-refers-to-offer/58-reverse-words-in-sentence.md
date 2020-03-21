@@ -15,7 +15,7 @@ tag: [algorithm]
 TODO
 
 ##### 实现
-```
+```Java
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -46,7 +46,7 @@ public class Solution {
 TODO
 
 ##### 实现
-```
+```Java
 public class Solution {
 
     public static void main(String[] args) {

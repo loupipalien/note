@@ -16,7 +16,7 @@ tag: [algorithm]
 在遍历字符串时, 可以使用一个 Map 按序来统计字符出现的次数, 最后返回第一个次数为 1 的字符; 这是以空间换时间的解法, 时间复杂度为 $O(n)$
 
 ##### 实现
-```
+```Java
 import java.util.LinkedHashMap;
 import java.util.Map;
 

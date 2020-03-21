@@ -26,7 +26,7 @@ class BinaryTreeNode {
 树的深度等于其子树的最大深度加一;
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         BinaryTreeNode root = new BinaryTreeNode(1)
@@ -88,7 +88,7 @@ public class Solution {
 从根节点开始比较两个子树的高度差, 当高度差超过 1 返回 false, 否则继续递归其子节点
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         BinaryTreeNode root = new BinaryTreeNode(1)
@@ -146,7 +146,7 @@ public class Solution {
 
 #### 优化
 以上算法, 自上而下遍历节点, 计算其子树高度时有很多重复计算, 如果能自下而上的计算则能避免重复计算; 如果使用后序遍历二叉树的每一个节点, 那么在遍历到一个节点之前就已经遍历了它的左右子树, 只要在遍历每个节点的时候记录它的深度, 就可以一边遍历一边判断节点是不是平衡的
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         BinaryTreeNode root = new BinaryTreeNode(1)
@@ -164,15 +164,13 @@ public class Solution {
     }
 
     private static boolean balancedBinaryTree(BinaryTreeNode root, Holder<Integer> depth) {
-        if (root == null) {
-            return true;
-        }
+        if (root == null) return true;
 
         Holder<Integer> leftDepth = Holder.of(0);
         Holder<Integer> rightDepth = Holder.of(0);
         if (balancedBinaryTree(root.left, leftDepth) && balancedBinaryTree(root.right, rightDepth)) {
             if (Math.abs(leftDepth.get() - rightDepth.get()) <= 1) {
-                depth.set(1 + (leftDepth.get() > rightDepth.get() ? leftDepth.get() : rightDepth.get()));
+                depth.set(Math.max(leftDepth.get() , rightDepth.get()) + 1);
                 return true;
             }
         }

@@ -18,7 +18,7 @@ tag: [algorithm]
   - 如果此字符是否在当前子字符串中有出现, 有则需计算子字符串的长度
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         String str = "arabcacfr";

@@ -16,7 +16,7 @@ tag: [algorithm]
 现在整型数组里有两个数字只出现一次, 那么这两个数字必然是不同的数字, 那么必然有一位分别为 1 和 0; 按照这一位的分别可以将数组分成两组, 只出现一次的数字分别在一个组里, 这时问题就简化为整型数组里只有一个数字出现了一次的情况
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         int[] array = {2, 4, 3, 6, 3, 2, 5, 5};
@@ -82,7 +82,7 @@ public class Solution {
 如果一个数字出现三次, 那么它的二进制表示的每一位 (0 或 1) 也出现三次, 如果把所有出现三次的数字的二进制表示的每一位都分别加起来, 那么每一位的和都能被 3 整除, 那么那个只出现一次的数字的二进制表示中表示为 0, 否则为 1
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         int[] array = new int[]{1, 2, 4, 2, 2, 6, 1, 1, 4, 4};

@@ -22,49 +22,21 @@ public class DigitsInSequence {
     }
 
     private static int digitsInSequence(int index) {
-        if (index < 0) {
-            return -1;
+        if (index < 0) return -1;
+        if (index == 0) return 0;
+        // 当前数字区间的位数和个数
+        double digit = 1, count = 9;
+        while (index > digit * count) {
+            index -= digit * count;
+            digit += 1;
+            count *= 10;
         }
-
-        if (index == 0) {
-            return 0;
-        } else {
-            index--;
-        }
-
-        // 当前数字区间的数字的位数
-        int digit = 1;
-        // 当前数字区间的数字的个数
-        int count = 9;
-        while (true) {
-            int length = digit * count;
-            if (index > length) {
-                index -= length;
-                digit += 1;
-                count *= 10;
-            } else {
-                int number = ((int) Math.pow(10, digit - 1)) + index / digit;
-                return digitInIndex(number++, index % digit);
-            }
-        }
-    }
-
-    private static int digitInIndex(int number, int index) {
-        int indexFromRight = countOfDigits(number) - index - 1;
-        while (indexFromRight-- > 0) {
-            number = number / 10;
-        }
+        // 计算出第 n 位所在的数字
+        int number = (int) (Math.pow(10, digit - 1) - 1 + Math.ceil(index / digit));
+        // 下标从 0 开始计算
+        int indexFromRight = (int) ((digit - index % digit) % digit);
+        while (indexFromRight-- > 0) number /= 10;
         return number % 10;
     }
-
-    private static int countOfDigits(int number) {
-        int count = 0;
-        while (number > 0) {
-            number /= 10;
-            count++;
-        }
-        return count;
-    }
-
 }
 ```

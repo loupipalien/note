@@ -15,7 +15,7 @@ tag: [algorithm]
 先把数组分隔为子数组, 统计出子数组内的逆序对个数, 然后在统计两个相邻子数组之间的逆序对个数; 在统计逆序对过程中, 需要对数组进行排序, 这个排序过程即为归并排序
 
 ##### 实现
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         int[] array = new int[]{7, 5, 6, 4};
@@ -34,7 +34,7 @@ public class Solution {
             return 0;
         }
 
-        int mid = (end + start) >> 1;
+        int mid = start + (end - start) / 2;
         int leftCount = mergeSort(array, start, mid);
         int rightCount = mergeSort(array, mid + 1, end);
         // i 初始化为前半段最后一个数字的下标, j 初始化为前半段最后一个数字的下标
