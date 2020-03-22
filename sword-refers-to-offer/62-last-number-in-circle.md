@@ -16,7 +16,7 @@ tag: [algorithm]
 创建 n 个节点的环形链表, 模拟此过程, 直到链表中只剩一个节点
 
 ##### 实现
-```
+```Java
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -27,15 +27,12 @@ public class Solution {
     }
 
     private static int lastNumberInCircle(int n, int m) {
-        if (n < 1 || m < 1) {
-            throw new IllegalArgumentException("Invalid Parameter");
-        }
+        if (n < 1 || m < 1) return -1;
+        if (m == 1) return n - 1;
 
         // 这里使用列表模拟环形链表, 当到列表尾的下一个时则重置到列表头
         List<Integer> circle = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
-            circle.add(i);
-        }
+        for (int i = 0; i < n; i++) circle.add(i);
 
         int current = 1;
         Iterator iterator = circle.iterator();

@@ -19,7 +19,7 @@ tag: [algorithm]
 
 ##### 实现
 - 使用公式, 避开乘除法
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         System.out.println(accumulate(10));
@@ -31,7 +31,7 @@ public class Solution {
 }
 ```
 - 使用递归调用代替循环, 使用短路代替判断
-```
+```Java
 public class Solution {
     public static void main(String[] args) {
         System.out.println(accumulate(10));

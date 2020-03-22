@@ -15,7 +15,7 @@ tag: [algorithm]
 首先可以将这 5 张牌排序, 然后计算非零的相邻间隔数是否大于零的个数; 如果有相同点数, 即有对子, 那可以直接判断不能称为顺子
 
 ##### 实现
-```
+```Java
 import java.util.Arrays;
 
 public class Solution {
