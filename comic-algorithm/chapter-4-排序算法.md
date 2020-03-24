@@ -24,14 +24,14 @@
 
 ```Java
 public static void bubbleSort(int[] array) {
-    // 最后依次交换的位置
-    int lastExchangeIndex = 0;
     // 数组中无序部分的边界
     int unsortedBorder = array.length - 1;
 
     for (int i = 0; i < array.length - 1; i++) {
         // 有序标记
         boolean isSorted = true;
+        // 最后依次交换的位置
+        int lastExchangeIndex = 0;
         for (int j = 0; j < unsortedBorder; j++) {
             if (array[j] > array[j + 1]) {
                 swap(array, j, j + 1);
