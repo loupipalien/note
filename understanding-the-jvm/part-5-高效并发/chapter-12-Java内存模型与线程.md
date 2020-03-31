@@ -288,6 +288,7 @@ Java 语言定义了五种线程状态, 在任意一个时间点, 一个线程�
   - 没有设置 Timeout 参数的 Thread.join() 方法
   - LockSupport.park() 方法
 - 限期等待 (Timed Waiting): 处于这种状态的线程也不会被分配 CPU 执行时间, 不过无须等待被其他线程显示唤醒, 在一定时间后会被系统自动唤醒; 以下方法会让线程进入限期的等待状态
+  - Thread.sleep() 方法
   - 设置了 Timeout 参数的 Object.wait() 方法
   - 设置了 Timeout 参数的 Thread.join() 方法
   - LockSupport.parkNanos() 方法
