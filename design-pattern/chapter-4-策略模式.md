@@ -7,7 +7,7 @@
 - ConcreteStrategy: 具体策略
 
 #### 代码示例
-```
+```Java
 // 上下文类
 public class Context {
     private AbstractStrategy strategy;
@@ -55,6 +55,9 @@ public class ConcreteStrategyB extends AbstractStrategy {
 - 一个系统里有许多类, 它们之间的区别在于它们的行为, 那么可以使用策略模式可以动态的让一个对象在许多行为中选择一种行为
 - 不希望客端知道复杂的, 与算法相关的数据结构, 在具体策略类中封装算法和相关的数据结构, 提高算法的保密性和安全性
 
+具体应用如 `java.util.concurrent.RejectedExecutionHandler`, `ThreadPoolExecutor` 是上下文
+
 >**参考:**
-[大话设计模式](https://book.douban.com/subject/2334288/)  
-[策略模式](https://design-patterns.readthedocs.io/zh_CN/latest/behavioral_patterns/strategy.html)
+- [大话设计模式](https://book.douban.com/subject/2334288/)  
+- [策略模式](https://design-patterns.readthedocs.io/zh_CN/latest/behavioral_patterns/strategy.html)
+- [深入解析策略模式](https://www.cnblogs.com/lewis0077/p/5133812.html)

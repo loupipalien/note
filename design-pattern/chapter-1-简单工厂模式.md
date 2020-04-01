@@ -10,7 +10,7 @@
 工厂所创建的产品的都是某个具体类的实例
 
 #### 代码实例
-```
+```Java
 // 工厂类
 public class SimpleFactory {
     public static AbstractProduct create(String name) {
@@ -72,7 +72,7 @@ public class ConcreteProductB extends AbstractProduct {
 | 客户端可以引入配置文件, 可以在不改动代码的情况下更换具体产品类 | 在有新的产品增加时, 需要修改工厂类代码, 违反了开放关闭原则 |
 
 #### 适用场景
-适用于具体实现类较少时, 且不易变化的场景下; 以及作为某一个类的静态工厂, 例如 `java.text.DateFormat`
+适用于具体实现类较少时, 且不易变化的场景下, 以及作为某一个类的静态工厂   具体应用如 `java.text.DateFormat`
 
 >**参考:**
 [大话设计模式](https://book.douban.com/subject/2334288/)  
