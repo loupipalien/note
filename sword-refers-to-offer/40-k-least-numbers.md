@@ -20,7 +20,7 @@ TODO
 
 ##### 实现
 - 基于 partition 函数的时间复杂度为 $O(n)$ 的算法
-```
+```Java
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
