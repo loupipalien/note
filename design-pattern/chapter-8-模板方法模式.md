@@ -8,7 +8,7 @@
 实现原语操作以完成算法中与特定子类相关的步骤
 
 #### 代码示例
-```
+```Java
 // 抽象类
 public abstract class AbstractClass {
     public abstract void primitiveOperation();
@@ -39,6 +39,8 @@ public class ConcreteClass extends AbstractClass {
 #### 适用场景
 - 一次性实现一个算法的不变部分, 并将可变的行为留给子类来实现
 - 各子类中公共的行为应被提取出来并集中到一个公共父类中以避免代码重复
+
+具体应用如 `java.util.HashMap` 与 `java.util.LinkedHashMap` 中的三个 `afterNodeXXX` 方法 
 
 >**参考:**
 [大话设计模式](https://book.douban.com/subject/2334288/)   

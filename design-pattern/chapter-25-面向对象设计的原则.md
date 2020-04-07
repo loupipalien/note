@@ -23,12 +23,14 @@
 #### 接口分离原则 (Interface Segregation Principle, ISP)
 
 #### 最少知识原则 (Least Knowledge Principle, LKP)
+也叫 `迪米特法则`; 如果两个类不必彼此直接通信, 那么这两个类就不应当发生直接的相互作用; 如果其中一个类需要调用另一个类的某一个方法的话, 可以通过第三者转发这个调用   
+其根本思想是强调了类之间的松耦合, 类之间的耦合越弱, 越有利于复用;一个处在弱耦合的类被修改, 不会对有关系的类造成波及, 也就是说信息的隐藏促进了软件的复用
 
 >**参考**
-[大话设计模式](https://book.douban.com/subject/2334288/)  
-[单一职责原则](http://www.cnblogs.com/gaochundong/p/single_responsibility_principle.html)  
-[开放封闭原则](http://www.cnblogs.com/gaochundong/p/open_closed_principle.html)  
-[依赖倒置原则](http://www.cnblogs.com/gaochundong/p/dependency_inversion_principle.html)  
-[里氏替换原则](http://www.cnblogs.com/gaochundong/p/liskov_substitution_principle.html)
-[接口分离原则](http://www.cnblogs.com/gaochundong/p/interface_segregation_principle.html)  
-[最少知识原则](http://www.cnblogs.com/gaochundong/p/least_knowledge_principle.html)
+- [大话设计模式](https://book.douban.com/subject/2334288/)  
+- [单一职责原则](http://www.cnblogs.com/gaochundong/p/single_responsibility_principle.html)  
+- [开放封闭原则](http://www.cnblogs.com/gaochundong/p/open_closed_principle.html)  
+- [依赖倒置原则](http://www.cnblogs.com/gaochundong/p/dependency_inversion_principle.html)  
+- [里氏替换原则](http://www.cnblogs.com/gaochundong/p/liskov_substitution_principle.html)
+- [接口分离原则](http://www.cnblogs.com/gaochundong/p/interface_segregation_principle.html)  
+- [最少知识原则](http://www.cnblogs.com/gaochundong/p/least_knowledge_principle.html)

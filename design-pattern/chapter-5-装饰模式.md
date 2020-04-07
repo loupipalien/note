@@ -1,5 +1,5 @@
 ### 装饰模式 (Decorator Pattern)
-动态的给一个对象添加一些额外的职责, 就增加功能来说, 装饰模式比生成子类更加灵活; 策略模式是一种结构型模式
+动态的给一个对象添加一些额外的职责, 就增加功能来说, 装饰模式比生成子类更加灵活; 装饰模式是一种结构型模式
 
 #### 模式角色
 - AbstractComponent: 抽象组件类
@@ -8,7 +8,7 @@
 - ConcreteDecorator: 具体装饰类
 
 #### 代码示例
-```
+```Java
 // 抽象组件
 public abstract class AbstractComponent {
     public abstract void operation();
@@ -76,10 +76,13 @@ public class ConcreteDecoratorB extends AbstractDecorator {
 | 可以使用不同的具体装饰类以及这些装饰类的排列组合, 创造出更多不同行为的组合; 可以使用多个具体装饰类来装饰同一对象, 得到功能更强大的对象 | 这种比继承更加灵活的特性, 同时也意味着装饰模式比继承更加易于出错和更难排错 |
 | 具体构件类与具体装饰类可以独立变化, 可以根据需要增加新的具体构建类和具体装饰类, 符合开放关闭原则 | - |
 
-#### 使用场景
+#### 适用场景
 - 在不影响其他兑现对象的情况下, 以动态透明的方式给单个对象添加职责
 - 当不能采用继承的方式对系统进行扩展或者采用继承不利于系统扩展和维护时; 不能采用给继承的情况主要有两类: 第一类是系统中存在大量独立的扩展, 为支持每一种组合将产生大量的子类, 使得子类数目呈爆炸性增长; 第二类是因为类定义为不能继承 (如 final 类)
 
+具体应用如 `java..io` 包中的输入输出流
+
 >**参考:**
-[大话设计模式](https://book.douban.com/subject/2334288/)   
-[装饰模式](https://design-patterns.readthedocs.io/zh_CN/latest/structural_patterns/decorator.html)
+- [大话设计模式](https://book.douban.com/subject/2334288/)   
+- [装饰模式](https://design-patterns.readthedocs.io/zh_CN/latest/structural_patterns/decorator.html)
+- [Java设计模式之装饰者模式](https://www.jianshu.com/p/c26b9b4a9d9e)

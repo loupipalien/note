@@ -6,7 +6,7 @@
 - SubSystem: 子系统类
 
 #### 代码示例
-```
+```Java
 // 外观类
 public class Facade {
     private SubSystemA systemA;
